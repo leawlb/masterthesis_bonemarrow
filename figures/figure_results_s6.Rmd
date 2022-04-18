@@ -1,0 +1,202 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This requires loaded cpi_interactions_yng_vs_old
+
+Heatmaps Related to figure results 3.
+
+## A
+
+emitters
+
+```{r}
+
+plot_a1 <- plot_list_HM[[1]]+
+  ggtitle(names(col_cts_red)[1])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_a2 <- plot_list_HM[[3]]+
+  ggtitle(names(col_cts_red)[3])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_a3 <- plot_list_HM[[5]]+
+  ggtitle(names(col_cts_red)[5])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_a4 <- plot_list_HM_leg[[6]]+
+  ggtitle(names(col_cts_red)[6])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_a5 <- plot_list_HM[[7]]+
+  ggtitle(names(col_cts_red)[7])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_a6 <- plot_list_HM[[8]]+
+  ggtitle(names(col_cts_red)[8])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_a7 <- plot_list_HM[[9]]+
+  ggtitle(names(col_cts_red)[9])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_a8 <- plot_list_HM[[10]]+
+  ggtitle(names(col_cts_red)[10])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_a9 <- plot_list_HM[[11]]+
+  ggtitle(names(col_cts_red)[11])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+
+plot_a1
+plot_a2
+plot_a3
+plot_a4
+plot_a5
+plot_a6
+plot_a7
+plot_a8
+plot_a9
+
+```
+
+Receivers
+
+```{r}
+
+plot_b1 <- plot_list_HM[[13]]+
+  ggtitle(names(col_cts_red)[13])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_b2 <- plot_list_HM[[14]]+
+  ggtitle(names(col_cts_red)[14])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_b3 <- plot_list_HM[[15]]+
+  ggtitle(names(col_cts_red)[15])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_b4 <- plot_list_HM_leg[[16]]+
+  ggtitle(names(col_cts_red)[16])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_b5 <- plot_list_HM[[17]]+
+  ggtitle(names(col_cts_red)[17])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_b6 <- plot_list_HM[[18]]+
+  ggtitle(names(col_cts_red)[18])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_b7 <- plot_list_HM[[19]]+
+  ggtitle(names(col_cts_red)[19])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_b8 <- plot_list_HM[[20]]+
+  ggtitle(names(col_cts_red)[20])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+plot_b9 <- plot_list_HM[[22]]+
+  ggtitle(names(col_cts_red)[22])+
+  theme(plot.title = element_text(size = 10, face = "bold"))
+
+plot_b1
+plot_b2
+plot_b3
+plot_b4
+plot_b5
+plot_b6
+plot_b7
+plot_b8
+plot_b9
+
+names(col_cts_red)
+
+
+```
+
+
+# Assemble
+
+```{r}
+
+figure_s6_a1 <- ggarrange(
+  
+  ncol = 5,
+  widths = c(1,1,1,1.8, 0.2),
+  plot_a1,
+  plot_a2,
+  plot_a3,
+  plot_a4
+)
+
+figure_s6_a1
+
+ggsave("images/figure_s6_a1.png",
+  figure_s6_a1,
+  width = 17*0.787402,
+  height = 4.8*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+```{r}
+
+figure_s6_a2 <- ggarrange(
+  
+  ncol = 5,
+  widths = c(1,1,1,1,1),
+  plot_a5,
+  plot_a6,
+  plot_a7,
+  plot_a8,
+  plot_a9
+)
+
+figure_s6_a2
+
+ggsave("images/figure_s6_a2.png",
+  figure_s6_a2,
+  width = 17*0.787402,
+  height = 4.2*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+```{r}
+
+figure_s6_b1 <- ggarrange(
+  
+  ncol = 5,
+  widths = c(1,1,1,1.75, 0.25),
+  plot_b1,
+  plot_b2,
+  plot_b3,
+  plot_b4
+)
+
+figure_s6_b1
+
+ggsave("images/figure_s6_b1.png",
+  figure_s6_b1,
+  width = 17*0.787402,
+  height = 4.8*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+```{r}
+
+figure_s6_b2 <- ggarrange(
+  
+  ncol = 5,
+  widths = c(1,1,1,1,1),
+  plot_b5,
+  plot_b6,
+  plot_b7,
+  plot_b8,
+  plot_b9
+)
+
+figure_s6_b2
+
+ggsave("images/figure_s6_b2.png",
+  figure_s6_b2,
+  width = 17*0.787402,
+  height = 4.2*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```

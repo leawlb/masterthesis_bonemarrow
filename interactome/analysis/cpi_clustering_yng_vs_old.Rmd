@@ -1,0 +1,475 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script calculates euclidian distances and analyses them. 
+From YOUNG and OLD datasets of THE SAME SPECIES.
+
+Replace the file path to load objects from different species.
+
+# Preparation
+
+## Libraries
+
+```{r libraries, message = FALSE}
+
+library(SingleCellExperiment)
+library(rlist)
+library(tidyverse)
+library(ComplexUpset)
+library(cowplot)
+library(ggpubr)
+library(ggbeeswarm)
+library(bluster)
+library(dendextend)
+library(pheatmap)
+library(RColorBrewer)
+library(viridis)
+library(ggplotify)
+
+
+#library(scran)
+#library(ggpubr)
+#library(scater)
+#library(data.table)
+
+ctpints_list[[9]][[2]][[210]]
+
+cpi_list[[9]]$Conditions
+
+```
+
+## Load
+
+### Code
+
+```{r load_code, message = FALSE}
+
+setwd("/home/l012t/Interspecies_BM")
+
+source(file = "code/filepath.R")
+source(file = "code/colors.R")
+source(file = "interactome/functions/cpi_functions_analysis.R")
+
+```
+
+### Objects
+
+Adjust the file paths to load objects from different species. 
+After this, nothing needs to be changed.
+
+```{r}
+
+# merged and pre-processed SCE objects
+sce_yng <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_young_SCE_m"))
+sce_old <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_old_SCE_m"))
+
+# corresponding cpi objects
+cpi_yng <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng_cpi"))
+cpi_old <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old_cpi"))
+
+# corresponding metrics objects
+ctpints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctpints"))
+ctints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctints"))
+nrlrs_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nrlrs"))
+
+ctpints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctpints"))
+ctints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctints"))
+nrlrs_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nrlrs"))
+
+name_yng <- "mmus_yng"
+name_old <- "mmus_old"
+species <- "mmus"
+
+max_ctpints <- 400
+max_ctints <- 600
+max_nrcells <- 10000
+max_nrlrs <- 220
+
+```
+
+Merge overview dfs for direct comparion between age groups.
+
+```{r}
+
+ctpints_both <- rbind(ctpints_yng[[1]], ctpints_old[[1]])
+ctpints_both$age <- factor(ctpints_both$age, levels = c("young", "old"))
+ctpints_both$emitter <- factor(ctpints_both$emitter, 
+                               levels = names(col_emi_red))
+ctpints_both$receiver <- factor(ctpints_both$receiver, 
+                               levels = names(col_rec_red))
+```
+
+```{r}
+
+ctints_both <- rbind(ctints_yng[[1]], ctints_old[[1]])
+ctints_both$age <- factor(ctints_both$age, levels = c("young", "old"))
+ctints_both$celltypes <- factor(ctints_both$celltypes, 
+                                levels = names(col_cts_red))
+```
+
+```{r}
+
+nrlrs_both <- rbind(nrlrs_yng, nrlrs_old)
+nrlrs_both$age <- factor(nrlrs_both$age, levels = c("young", "old"))
+nrlrs_both$celltypes <- factor(nrlrs_both$celltypes, 
+                               levels = names(col_cts_red))
+```
+
+# Analysis
+
+Calculate euclidian distances first.
+
+```{r}
+
+#scaling (and rename for convenience)
+cpi_both_scaled <- scale(t(cpi_merged_pca$Score))
+
+#euclidian distances
+cpi_both_dist <- dist(cpi_both_scaled, method = 'euclidean')
+
+# make a df for convenience
+cpi_both_dist_mat <- as.matrix(cpi_both_dist)
+cpi_both_dist_df <- as.data.frame(cpi_both_dist_mat)
+
+```
+
+## Direct Measurement between young and old ctps
+
+Get the direct euclidian distances between ctps from young and ctps from old.
+
+```{r}
+
+dist_oy <- cpi_both_dist_df[grep("yng", rownames(cpi_both_dist_df)), 
+                         grep("old", colnames(cpi_both_dist_df))]
+
+dist_oy <- rownames_to_column(dist_oy, var = "ct_pair_yng")
+
+dist_oy_direct <- dist_oy %>%
+  pivot_longer(cols = c(2:ncol(dist_oy)),
+               names_to = "ct_pair_old",
+               names_ptypes = list("ct_pair_old" = character()),
+               values_to = "distance",
+               values_ptypes = list("euclidian_distance" = numeric())
+  )
+
+dist_oy_direct$ct_pair_yng <- gsub(paste0("_", species, "_", "yng"), "", dist_oy_direct$ct_pair_yng)
+dist_oy_direct$ct_pair_old <- gsub(paste0("_", species, "_", "old"), "", dist_oy_direct$ct_pair_old)
+
+
+dist_oy_direct$emitter_old <- gsub("[&][[:print:]]+", "", dist_oy_direct$ct_pair_old)
+dist_oy_direct$receiver_old <- gsub("[[:print:]]+[&]", "", dist_oy_direct$ct_pair_old)
+
+dist_oy_direct$emitter_yng <- gsub("[&][[:print:]]+", "", dist_oy_direct$ct_pair_yng)
+dist_oy_direct$receiver_yng <- gsub("[[:print:]]+[&]", "", dist_oy_direct$ct_pair_yng)
+
+dist_oy_direct$emitter_old <- factor(dist_oy_direct$emitter_old,
+                                levels = names(col_emi_red))
+dist_oy_direct$emitter_yng <- factor(dist_oy_direct$emitter_yng,
+                                levels = names(col_emi_red))
+
+dist_oy_direct$receiver_old <- factor(dist_oy_direct$receiver_old,
+                                levels = names(col_rec_red))
+dist_oy_direct$receiver_yng <- factor(dist_oy_direct$receiver_yng,
+                                levels = names(col_rec_red))
+
+dist_oy_direct_direct <- dist_oy_direct[dist_oy_direct$ct_pair_yng == dist_oy_direct$ct_pair_old,]
+
+
+```
+
+```{r}
+
+plot_direct_emi <- ggplot(dist_oy_direct_direct, 
+                  aes(x = emitter_old, y = distance, color = emitter_old))+
+  geom_quasirandom()
+  
+
+plot_direct_rec <- ggplot(dist_oy_direct_direct,
+                  aes(x = receiver_old, y = distance, color = receiver_old))+
+  geom_quasirandom()
+
+plot_direct_emi
+plot_direct_rec
+
+```
+
+## Distances within age groups
+
+Euclidian distances within age groups.
+
+Get all distances within young, then all distances within old. 
+Then substract complete yng from complete old.
+
+```{r}
+
+cpi_both_dist_df_old <- cpi_both_dist_df[
+  grep("old", colnames(cpi_both_dist_df)),
+  grep("old", rownames(cpi_both_dist_df))]
+
+cpi_both_dist_df_old <- cpi_both_dist_df_old[
+  order(rownames(cpi_both_dist_df_old)),order(colnames(cpi_both_dist_df_old))]
+
+cpi_both_dist_df_yng <- cpi_both_dist_df[
+  grep("yng", colnames(cpi_both_dist_df)),
+  grep("yng", rownames(cpi_both_dist_df))]
+
+cpi_both_dist_df_yng <- cpi_both_dist_df_yng[
+  order(rownames(cpi_both_dist_df_yng)),order(colnames(cpi_both_dist_df_yng))]
+
+dist_df <- cpi_both_dist_df_old - cpi_both_dist_df_yng
+dist_df <- dist_df[order(rownames(dist_df)),order(colnames(dist_df))]
+
+```
+
+
+```{r}
+
+# change rownames and colnames to actual cell type names
+
+
+rownames(dist_df) <- gsub(paste0("_", species, "_", "old"), "", rownames(dist_df))
+colnames(dist_df) <- gsub(paste0("_", species, "_", "old"), "", colnames(dist_df))
+
+
+dist_df <- rownames_to_column(dist_df, var = "ct_pair1")
+
+dist_df_long <- dist_df %>%
+  pivot_longer(cols = c(2:ncol(dist_df)),
+               names_to = "ct_pair2",
+               names_ptypes = list("ct_pair2" = character()),
+               values_to = "distance",
+               values_ptypes = list("euclidian_distance" = numeric())
+  )
+
+
+dist_df_long$emitter1 <- gsub("[&][[:print:]]+", "", dist_df_long$ct_pair1)
+dist_df_long$receiver1 <- gsub("[[:print:]]+[&]", "", dist_df_long$ct_pair1)
+
+dist_df_long$emitter2 <- gsub("[&][[:print:]]+", "", dist_df_long$ct_pair2)
+dist_df_long$receiver2 <- gsub("[[:print:]]+[&]", "", dist_df_long$ct_pair2)
+
+dist_df_long$emitter1 <- factor(dist_df_long$emitter1,
+                                levels = names(col_emi_red))
+dist_df_long$emitter2 <- factor(dist_df_long$emitter2,
+                                levels = names(col_emi_red))
+
+dist_df_long$receiver1 <- factor(dist_df_long$receiver1,
+                                levels = names(col_rec_red))
+dist_df_long$receiver2 <- factor(dist_df_long$receiver2,
+                                levels = names(col_rec_red))
+```
+
+
+```{r}
+
+median_emi1 <- dist_df_long %>%
+  group_by(emitter1) %>%
+  summarise(median_val = median(distance))
+
+plot_within_emi <- ggplot(dist_df_long,
+                  aes(x = emitter1, y = distance, color = emitter1))+
+  geom_quasirandom(size = 0.2)+
+  geom_point(median_emi1, mapping = aes(y = median_val), color = "black", 
+             fill = "white",  shape = 22, size = 3, stroke = 1)
+
+median_rec1 <- dist_df_long %>%
+  group_by(receiver1) %>%
+  summarise(median_val = median(distance))
+  
+
+plot_within_rec <- ggplot(dist_df_long, 
+                  aes(x = receiver1, y = distance, color = receiver1))+
+  geom_quasirandom(size = 0.2)+
+  geom_point(median_rec1, mapping = aes(y = median_val), color = "black",
+             fill = "white",  shape = 22, size = 3, stroke = 1)
+
+  
+plot_within_emi
+plot_within_rec
+
+```
+
+## Clustering
+
+Try different types of clustering.
+
+```{r}
+
+# ward d2 for type
+cpi_both_ward <- hclust(cpi_both_dist, method = "ward.D2")
+plot(cpi_both_ward, labels = FALSE, main = "ward.D2")
+
+# others for spectrum
+cpi_both_comp <- hclust(cpi_both_dist, method = "complete")
+plot(cpi_both_comp, labels = FALSE, main = "complete")
+
+cpi_both_avrg <- hclust(cpi_both_dist, method = "average")
+plot(cpi_both_avrg, labels = FALSE, main = "average")
+
+cpi_both_spct <- hclust(cpi_both_dist, method = "single")
+plot(cpi_both_spct, labels = FALSE, main = "single")
+
+```
+
+Cut the tree at different places.
+This should be decided after looking at the different methods and their 
+branches.
+
+```{r}
+
+# cut the three into k clusters according to ward d2 method
+cpi_both_ward_k4 <- cutree(cpi_both_ward, k = 4)
+cpi_both_ward_k5 <- cutree(cpi_both_ward, k = 5)
+cpi_both_ward_k6 <- cutree(cpi_both_ward, k = 6)
+
+# add to cpi object
+cpi_both$Celltypes$cluster <- cpi_both_ward_k6
+
+```
+
+
+
+### Visualise
+
+
+Clustering
+
+```{r}
+
+# ward d2 for type
+cpi_both_ward <- hclust(cpi_both_dist, method = "ward.D2")
+
+# cut the three into k clusters according to ward d2 method
+cpi_both_ward_k6 <- cutree(cpi_both_ward, k = 6)
+
+# add to cpi object
+cpi_both$Celltypes$cluster <- cpi_both_ward_k6
+
+cpi_both$Celltypes$cluster_anno <- cpi_both$Celltypes$cluster
+
+# name the clusters according to the cell type pairs they contain
+cpi_both$Celltypes$cluster_anno[cpi_both$Celltypes$cluster == "1"] <- "mixed young"
+cpi_both$Celltypes$cluster_anno[cpi_both$Celltypes$cluster == "2"] <- "mixed LMPPs"
+cpi_both$Celltypes$cluster_anno[cpi_both$Celltypes$cluster == "3"] <- "mixed ECs"
+cpi_both$Celltypes$cluster_anno[cpi_both$Celltypes$cluster == "4"] <- "mixed old"
+cpi_both$Celltypes$cluster_anno[cpi_both$Celltypes$cluster == "5"] <- "old Mono/Dendr. prog."
+cpi_both$Celltypes$cluster_anno[cpi_both$Celltypes$cluster == "6"] <- "old LT-HSCs"
+
+cpi_both$Celltypes$cluster_anno <- factor(cpi_both$Celltypes$cluster_anno,
+                                          levels = c("mixed young",
+                                                     "mixed old",
+                                                     "mixed ECs",
+                                                     "old LT-HSCs",
+                                                     "old Mono/Dendr. prog.",
+                                                     "mixed LMPPs"))
+
+
+```
+
+Get HVGs
+
+```{r}
+
+var <- modelGeneVar(cpi_both$Score)
+
+top_hvg <- getTopHVGs(var, var.field = "bio", n = 30)
+
+top_hvg
+
+```
+
+Own color palette because most scores are 0 and there is nothing between 0 and 0.5
+
+
+Annotations and annotation colours, one for each plot
+
+
+```{r}
+
+cpi_both_hvg <- cpi_both
+cpi_both_hvg$Score <- cpi_both$Score[rownames(cpi_both$Score) %in% top_hvg,]
+cpi_both_hvg$Interactions <- cpi_both$Interactions[rownames(cpi_both$Score) %in% top_hvg,]
+
+anno_row_hvg <- data.frame(
+  row.names = rownames(cpi_both_hvg$Score),
+  Interactiontype = cpi_both_hvg$Interactions$interaction_type
+)
+order2_hvg <- order(anno_row_hvg$Interactiontype)
+
+anno_col_hvg <- data.frame(
+  row.names = colnames(cpi_both_hvg$Score),
+  Cluster = as.character(cpi_both_hvg$Celltypes$cluster_anno)
+)
+# as already correctly ordered
+
+# colours
+heatmap_col_all <- list(
+  Cluster = col_cls_man_anno,
+  Interactiontype = col_itp
+  )
+
+pheatmap(cpi_both_hvg$Score[order2,],
+         show_colnames = FALSE,
+         show_rownames = FALSE,
+         cluster_cols = cpi_both_ward,
+         cluster_rows =  FALSE,
+         annotation_col = anno_col_hvg,
+         annotation_row = anno_row_hvg,
+         annotation_colors = heatmap_col_all,
+         main = c("Clustering of Young and Old Interaction Pairs"),
+         color = mypalette
+         )
+
+```
+
+```{r}
+
+anno_row <- data.frame(
+  row.names = rownames(cpi_both$Score),
+  Interactiontype = cpi_both$Interactions$interaction_type
+)
+order2 <- order(anno_row$Interactiontype)
+
+anno_col <- data.frame(
+  row.names = colnames(cpi_both$Score),
+  Cluster = as.character(cpi_both$Celltypes$cluster_anno)
+)
+# as already correctly ordered
+
+# colours
+heatmap_col_all <- list(
+  Cluster = col_cls_man_anno,
+  Interactiontype = col_itp
+  )
+
+pheatmap(cpi_both$Score[order2,],
+         show_colnames = FALSE,
+         show_rownames = FALSE,
+         cluster_cols = cpi_both_ward,
+         cluster_rows =  FALSE,
+         annotation_col = anno_col,
+         annotation_row = anno_row,
+         annotation_colors = heatmap_col_all,
+         main = c("Clustering of Young and Old Interaction Pairs"),
+         color = mypalette
+         )
+
+
+```
+

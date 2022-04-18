@@ -1,0 +1,1232 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script visualises important metrics for two cpi objects from YOUNG and OLD
+datasets of THE SAME SPECIES.
+
+Replace the file path to load objects from different species.
+
+# Preparation
+
+## Libraries
+
+```{r libraries, message = FALSE}
+
+library(SingleCellExperiment)
+library(rlist)
+library(tidyverse)
+
+#library(scran)
+#library(ggpubr)
+#library(scater)
+#library(data.table)
+
+```
+
+## Load
+
+### Code
+
+```{r load_code, message = FALSE}
+
+setwd("/home/l012t/Interspecies_BM")
+
+source(file = "code/filepath.R")
+source(file = "code/colors.R")
+
+```
+
+### Objects
+
+Adjust the file paths to load objects from different species. 
+After this, nothing needs to be changed.
+
+```{r}
+
+# merged and pre-processed SCE objects
+sce_yng <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_young_SCE_ds_ctrm"))
+sce_old <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_old_SCE_ds_ctrm"))
+
+# corresponding cpi objects
+cpi_yng <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng_cpi"))
+cpi_old <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old_cpi"))
+
+# corresponding metrics objects
+ctpints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctpints"))
+ctints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctints"))
+nrlrs_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nrlrs"))
+
+ctpints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctpints"))
+ctints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctints"))
+nrlrs_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nrlrs"))
+
+name_yng <- "mmus_yng"
+name_old <- "mmus_old"
+species <- "mmus"
+
+max_ctpints <- 500
+max_ctints <- 1500
+max_nrcells <- 10000
+
+```
+
+Merge overview dfs for direct comparion between age groups.
+
+```{r}
+
+ctpints_both <- rbind(ctpints_yng[[1]], ctpints_old[[1]])
+ctpints_both$age <- factor(ctpints_both$age, levels = c("young", "old"))
+ctpints_both$emitter <- factor(ctpints_both$emitter, 
+                               levels = names(col_emi_red))
+ctpints_both$receiver <- factor(ctpints_both$receiver, 
+                               levels = names(col_rec_red))
+```
+
+```{r}
+
+ctints_both <- rbind(ctints_yng[[1]], ctints_old[[1]])
+ctints_both$age <- factor(ctints_both$age, levels = c("young", "old"))
+ctints_both$celltypes <- factor(ctints_both$celltypes, 
+                                levels = names(col_cts_red))
+```
+
+```{r}
+
+nrlrs_both <- rbind(nrlrs_yng, nrlrs_old)
+nrlrs_both$age <- factor(nrlrs_both$age, levels = c("young", "old"))
+nrlrs_both$celltypes <- factor(nrlrs_both$celltypes, 
+                               levels = names(col_cts_red))
+```
+
+# QC Analysis
+
+## Cell type pair level
+
+### Nr of interactions
+
+Visualise distribution of nr of interactions per cell type pair.
+
+```{r}
+
+hist_ctpints_emi_yng <- ggplot(ctpints_yng[[1]], 
+                               aes(x = reorder(ct_pairs, -nr_ints), 
+                                   y = nr_ints, 
+                                   fill = reorder(emitter, -nr_ints)))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_blank())+
+  scale_fill_manual("Emitter partner", values = col_emi_red)+
+  ylab("Number of interactions per cell type pair")+
+  xlab("Cell type pairs")+
+  ggtitle(paste(name_yng, "interactome"))+
+  ylim(limits = c(0, max_ctpints))
+  
+hist_ctpints_rec_yng <- ggplot(ctpints_yng[[1]], 
+                               aes(x = reorder(ct_pairs, -nr_ints), 
+                                   y = nr_ints, 
+                                   fill = reorder(receiver, -nr_ints)))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_blank())+
+  scale_fill_manual("Receiver partner", values = col_rec_red)+
+  ylab("Number of interactions per cell type pair")+
+  xlab("Cell type pairs")+
+  ggtitle(paste(name_yng, "interactome"))+
+  ylim(limits = c(0, max_ctpints))
+
+hist_ctpints_emi_yng
+hist_ctpints_rec_yng
+
+```
+
+```{r}
+
+hist_ctpints_emi_old <- ggplot(ctpints_old[[1]], 
+                               aes(x = reorder(ct_pairs, -nr_ints), 
+                                   y = nr_ints, 
+                                   fill = reorder(emitter, -nr_ints)))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_blank())+
+  scale_fill_manual("Emitter partner", values = col_emi_red)+
+  ylab("Number of interactions per cell type pair")+
+  xlab("Cell type pairs")+
+  ggtitle(paste(name_old, "interactome"))+
+  ylim(limits = c(0, max_ctpints))
+  
+hist_ctpints_rec_old <- ggplot(ctpints_old[[1]], 
+                               aes(x = reorder(ct_pairs, -nr_ints), 
+                                   y = nr_ints, 
+                                   fill = reorder(receiver, -nr_ints)))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_blank())+
+  scale_fill_manual("Receiver partner", values = col_rec_red)+
+  ylab("Number of interactions per cell type pair")+
+  xlab("Cell type pairs")+
+  ggtitle(paste(name_old, "interactome"))+
+  ylim(limits = c(0, max_ctpints))
+
+hist_ctpints_emi_old
+hist_ctpints_rec_old
+
+```
+
+Visualise per age group.
+
+```{r}
+
+bp_ctpints_age <- ggplot(ctpints_both, aes(x = age, y = nr_ints, fill = age))+
+  geom_boxplot()+
+  theme_classic()+
+  scale_fill_manual("Age", values = col_age)+
+  ylab("Number of interactions per cell type pair")+
+  xlab("Age")+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, max_ctpints))
+
+bp_ctpints_age_emi <- ggplot(ctpints_both, 
+                             aes(x = emitter, y = nr_ints, fill = age))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Age", values = col_age)+
+  ylab("Number of interactions per cell type pair")+
+  xlab("Emitter partner")+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, max_ctpints))
+
+bp_ctpints_age_rec <- ggplot(ctpints_both, 
+                             aes(x = receiver, y = nr_ints, fill = age))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Age", values = col_age)+
+  ylab("Number of interactions per cell type pair")+
+  xlab("Emitter partner")+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, max_ctpints))
+
+bp_ctpints_age
+bp_ctpints_age_emi
+bp_ctpints_age_rec
+
+```
+
+Visualise by partner cell types.
+
+```{r}
+
+bp_ctpints_emi <- ggplot(ctpints_both, 
+                         aes(x = emitter, y = nr_ints, fill = emitter))+
+  geom_boxplot()+
+  theme_classic()+
+  scale_fill_manual("Emitter partner", values = col_emi_red)+
+  ylab("Number of interactions per cell type pair")+
+  xlab("Emitter partner")+
+  theme(axis.text.x = element_text(angle = 90))+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, max_ctpints))
+
+bp_ctpints_emi_age <- ggplot(ctpints_both, 
+                             aes(x = age, y = nr_ints, fill = emitter))+
+  geom_boxplot()+
+  theme_classic()+
+  scale_fill_manual("Emitter partner", values = col_emi_red)+
+  ylab("Number of interactions per cell type pair")+
+  xlab("Age")+
+  theme(axis.text.x = element_text(angle = 90))+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, max_ctpints))
+
+bp_ctpints_rec <- ggplot(ctpints_both, 
+                         aes(x = receiver, y = nr_ints, fill = receiver))+
+  geom_boxplot()+
+  theme_classic()+
+  scale_fill_manual("Receiver partner", values = col_rec_red)+
+  ylab("Number of interactions per cell type pair")+
+  xlab("Receiver partner")+
+  theme(axis.text.x = element_text(angle = 90))+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, max_ctpints))
+
+bp_ctpints_rec_age <- ggplot(ctpints_both, 
+                             aes(x = age, y = nr_ints, fill = receiver))+
+  geom_boxplot()+
+  theme_classic()+
+  scale_fill_manual("Receiver partner", values = col_rec_red)+
+  ylab("Number of interactions per cell type pair")+
+  xlab("Age")+
+  theme(axis.text.x = element_text(angle = 90))+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, max_ctpints))
+
+bp_ctpints_emi
+bp_ctpints_emi_age
+bp_ctpints_rec
+bp_ctpints_rec_age
+
+```
+
+### Nr of cells
+
+Generically look at nr of cells per cell type first.
+Histograms.
+
+```{r}
+
+hist_cts_yng <- ggplot(ctints_yng$overview, 
+                       aes(x = reorder(celltypes, -nr_cells), y = nr_cells,
+                           fill = annotation))+
+  geom_col()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  xlab("Cell type")+
+  ylab("Number of cells per cell type")+
+  scale_fill_manual("Annotation", values = col_ann)+
+  scale_y_continuous(limits = c(0, max_nrcells))+
+  ggtitle(paste(name_yng))
+
+hist_cts_old <- ggplot(ctints_old$overview, 
+                       aes(x = reorder(celltypes, -nr_cells), y = nr_cells,
+                           fill = annotation))+
+  geom_col()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  xlab("Cell type")+
+  ylab("Number of cells per cell type")+
+  scale_fill_manual("Annotation", values = col_ann)+
+  scale_y_continuous(limits = c(0, max_nrcells))+
+  ggtitle(paste(name_old))
+
+hist_cts_yng
+hist_cts_old
+
+```
+
+Boxplots.
+
+```{r}
+
+bp_ct_yng_anno <- ggplot(ctints_yng$overview, 
+                            aes(x = annotation, 
+                                y = nr_cells, fill = annotation))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_blank())+
+  scale_fill_manual("Annotation", values = col_ann)+
+  ylab("Number of cells")+
+  xlab("Annotation")+
+  ggtitle(paste(name_yng))+
+  ylim(limits = c(0, max_nrcells))
+
+bp_ct_old_anno <- ggplot(ctints_old$overview, 
+                            aes(x = annotation, 
+                                y = nr_cells, fill = annotation))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_blank())+
+  scale_fill_manual("Annotation", values = col_ann)+
+  ylab("Number of cells")+
+  xlab("Annotation")+
+  ggtitle(paste(name_old))+
+  ylim(limits = c(0, max_nrcells))
+
+bp_ct_age <- ggplot(ctints_both, 
+                    aes(x = age, 
+                        y = nr_cells, fill = age))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_blank())+
+  scale_fill_manual("Age", values = col_age)+
+  ylab("Number of cells")+
+  xlab("Age")+
+  ggtitle(paste(name_old))+
+  ylim(limits = c(0, max_nrcells))
+
+bp_ct_yng_anno
+bp_ct_old_anno
+bp_ct_age
+
+```
+
+
+```{r}
+
+pt_ctpints_nrc_yng <- ggplot(ctpints_yng$overview)+
+  geom_point(aes(x = nr_cells_emi, y = nr_ints), 
+             size = 1.2, color = col_ann['emitter'])+
+  geom_point(aes(x = nr_cells_rec, y = nr_ints), 
+             size = 1.2, color = col_ann['receiver'])+
+  theme_classic()+
+  xlab("Number of cells per cell type")+
+  ylab("Number of interactions per cell type pair")+
+  scale_x_continuous(limits = c(0, max_nrcells))+
+  scale_y_continuous(limits = c(0, max_ctpints))+
+  ggtitle(paste(name_yng, "interactome"))
+
+pt_ctpints_nrc_old <- ggplot(ctpints_old$overview)+
+  geom_point(aes(x = nr_cells_emi, y = nr_ints), 
+             size = 1.2, color = col_ann['emitter'])+
+  geom_point(aes(x = nr_cells_rec, y = nr_ints), 
+             size = 1.2, color = col_ann['receiver'])+
+  theme_classic()+
+  xlab("Number of cells per cell type")+
+  ylab("Number of interactions per cell type pair")+
+  scale_x_continuous(limits = c(0, max_nrcells))+
+  scale_y_continuous(limits = c(0, max_ctpints))+
+  ggtitle(paste(name_old, "interactome"))
+
+pt_ctpints_nrc_yng
+pt_ctpints_nrc_old
+
+```
+
+```{r}
+
+hist_nrc_ctp_emi_yng <- ggplot(ctpints_yng[[1]], 
+                               aes(x = reorder(ct_pairs, -(nr_cells_emi+nr_cells_rec)),
+                                   y = nr_cells_emi+nr_cells_rec, 
+                                   fill = emitter))+
+  geom_col()+
+  theme_classic()+
+  theme(axis.text.x = element_blank())+
+  scale_fill_manual("Emitter partner", values = col_emi_red)+
+  ylab("Number of cells per cell type pair")+
+  xlab("Cell type pairs")+
+  ggtitle(paste(name_yng, "interactome"))+
+  ylim(limits = c(0, (max_nrcells*2)))
+
+hist_nrc_ctp_rec_yng <- ggplot(ctpints_yng[[1]], 
+                               aes(x = reorder(ct_pairs, -(nr_cells_emi+nr_cells_rec)),
+                                   y = nr_cells_emi+nr_cells_rec, 
+                                   fill = receiver))+
+  geom_col()+
+  theme_classic()+
+  theme(axis.text.x = element_blank())+
+  scale_fill_manual("Receiver partner", values = col_rec_red)+
+  ylab("Number of cells per cell type pair")+
+  xlab("Cell type pairs")+
+  ggtitle(paste(name_yng, "interactome"))+
+  ylim(limits = c(0, (max_nrcells*2)))
+
+hist_nrc_ctp_emi_old <- ggplot(ctpints_old[[1]], 
+                               aes(x = reorder(ct_pairs, -(nr_cells_emi+nr_cells_rec)),
+                                   y = nr_cells_emi+nr_cells_rec, 
+                                   fill = emitter))+
+  geom_col()+
+  theme_classic()+
+  theme(axis.text.x = element_blank())+
+  scale_fill_manual("Emitter partner", values = col_emi_red)+
+  ylab("Number of cells per cell type pair")+
+  xlab("Cell type pairs")+
+  ggtitle(paste(name_old, "interactome"))+
+  ylim(limits = c(0, (max_nrcells*2)))
+
+hist_nrc_ctp_rec_old <- ggplot(ctpints_old[[1]], 
+                               aes(x = reorder(ct_pairs, -(nr_cells_emi+nr_cells_rec)),
+                                   y = nr_cells_emi+nr_cells_rec, 
+                                   fill = receiver))+
+  geom_col()+
+  theme_classic()+
+  theme(axis.text.x = element_blank())+
+  scale_fill_manual("Receiver partner", values = col_rec_red)+
+  ylab("Number of cells per cell type pair")+
+  xlab("Cell type pairs")+
+  ggtitle(paste(name_old, "interactome"))+
+  ylim(limits = c(0, (max_nrcells*2)))
+
+hist_nrc_ctp_emi_yng
+hist_nrc_ctp_rec_yng
+hist_nrc_ctp_emi_old
+hist_nrc_ctp_rec_old
+
+```
+
+### Scores
+
+```{r}
+
+ints_score_yng <- cpi_yng$Score
+ints_score_old <- cpi_old$Score
+
+ints_score_yng <- ints_score_yng %>%
+  pivot_longer(cols = c(1:ncol(ints_score_yng)), 
+               names_to = "ct_pair", values_to = "score")
+ints_score_old <- ints_score_old %>%
+  pivot_longer(cols = c(1:ncol(ints_score_old)), 
+               names_to = "ct_pair", values_to = "score")
+
+ints_score_yng <- ints_score_yng[which(!is.na(ints_score_yng$score)),]
+ints_score_yng$nr_ints <- ctpints_yng[[1]]$nr_ints[match(
+    ints_score_yng$ct_pair, ctpints_yng[[1]]$ct_pairs)]
+
+ints_score_old <- ints_score_old[which(!is.na(ints_score_old$score)),]
+ints_score_old$nr_ints <- ctpints_old[[1]]$nr_ints[match(
+    ints_score_old$ct_pair, ctpints_old[[1]]$ct_pairs)]
+
+bp_ctpints_sc_yng <- ggplot(ints_score_yng, 
+                            aes(x = reorder(ct_pair, nr_ints), 
+                                y = score, fill = nr_ints))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_blank())+
+  scale_fill_continuous("Nr ints/ctp",  limits = c(0, max_ctpints))+
+  ylab("LRI Score")+
+  xlab("Cell type pair")+
+  ggtitle(paste(name_yng, "interactome"))+
+  ylim(limits = c(0,1))
+
+bp_ctpints_sc_old <- ggplot(ints_score_old, 
+                            aes(x = reorder(ct_pair, nr_ints), 
+                                y = score, fill = nr_ints))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_blank())+
+  scale_fill_continuous("Nr ints/ctp",  limits = c(0, max_ctpints))+
+  ylab("LRI Score")+
+  xlab("Cell type pair")+
+  ggtitle(paste(name_old, "interactome"))+
+  ylim(limits = c(0,1))
+
+bp_ctpints_sc_yng
+bp_ctpints_sc_old
+
+```
+
+### Percentage of used interactions
+
+Calculate how many of the possible interactions of cts are used in the 
+specific ctps.
+Requires info from both ctpints and ctints.
+
+```{r}
+
+# young
+ints_frac_yng <- ctpints_yng$overview
+
+ints_frac_yng$nr_ints_emitter <- vector(
+  length = nrow(ints_frac_yng))
+ints_frac_yng$nr_ints_receiver <- vector(
+  length = nrow(ints_frac_yng))
+
+ints_frac_yng$nr_ints_emitter <- ctints_yng$overview$nr_ints[
+  match(ints_frac_yng$emitter, ctints_yng$overview$celltypes)]
+ints_frac_yng$nr_ints_receiver <- ctints_yng$overview$nr_ints[
+  match(ints_frac_yng$receiver, ctints_yng$overview$celltypes)]
+
+ints_frac_yng$perc_ints_emi <- ints_frac_yng$nr_ints/ints_frac_yng$nr_ints_emitter
+ints_frac_yng$perc_ints_rec <- ints_frac_yng$nr_ints/ints_frac_yng$nr_ints_receiver
+
+# old
+ints_frac_old <- ctpints_old$overview
+
+ints_frac_old$nr_ints_emitter <- vector(
+  length = nrow(ints_frac_old))
+ints_frac_old$nr_ints_receiver <- vector(
+  length = nrow(ints_frac_old))
+
+ints_frac_old$nr_ints_emitter <- ctints_old$overview$nr_ints[
+  match(ints_frac_old$emitter, ctints_old$overview$celltypes)]
+ints_frac_old$nr_ints_receiver <- ctints_old$overview$nr_ints[
+  match(ints_frac_old$receiver, ctints_old$overview$celltypes)]
+
+ints_frac_old$perc_ints_emi <- ints_frac_old$nr_ints/ints_frac_old$nr_ints_emitter
+ints_frac_old$perc_ints_rec <- ints_frac_old$nr_ints/ints_frac_old$nr_ints_receiver
+
+```
+
+Barplots.
+
+```{r}
+
+barp_intfrac_yng_emi <- ggplot(ints_frac_yng, 
+                          aes(x = emitter, y = perc_ints_emi, fill = receiver))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Receivers", values = col_rec_red)+
+  ylab("nr ints per ctp/nr possible ints per emitter")+
+  xlab("Emitters")+
+  ggtitle(paste("Interactions used per ctp [%]", name_yng, "interactome"))+
+  ylim(limits = c(0, 1))
+
+barp_intfrac_yng_rec <- ggplot(ints_frac_yng, 
+                          aes(x = receiver, y = perc_ints_rec, fill = emitter))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Emitters", values = col_emi_red)+
+  ylab("nr ints per ctp/nr possible ints per receiver")+
+  xlab("Receivers")+
+  ggtitle(paste("Interactions used per ctp [%]", name_yng, "interactome"))+
+  ylim(limits = c(0, 1))
+
+barp_intfrac_old_emi <- ggplot(ints_frac_old, 
+                          aes(x = emitter, y = perc_ints_emi, fill = receiver))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Receivers", values = col_rec_red)+
+  ylab("nr ints per ctp/nr possible ints per emitter")+
+  xlab("Emitters")+
+  ggtitle(paste("Interactions used per ctp [%]", name_old, "interactome"))+
+  ylim(limits = c(0, 1))
+
+barp_intfrac_old_rec <- ggplot(ints_frac_old, 
+                          aes(x = receiver, y = perc_ints_rec, fill = emitter))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Emitters", values = col_emi_red)+
+  ylab("nr ints per ctp/nr possible ints per receiver")+
+  xlab("Receivers")+
+  ggtitle(paste("Interactions used per ctp [%]", name_old, "interactome"))+
+  ylim(limits = c(0, 1))
+
+barp_intfrac_yng_emi
+barp_intfrac_yng_rec
+barp_intfrac_old_emi
+barp_intfrac_old_rec  
+
+```
+
+Boxplots.
+
+```{r}
+
+bp_intfrac_yng_emi <- ggplot(ints_frac_yng, 
+                             aes(x = emitter, 
+                                 y = perc_ints_emi, 
+                                 fill = emitter))+
+  geom_boxplot(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Emitters", values = col_emi_red)+
+  ylab("nr ints per ctp/nr possible ints per emitter")+
+  xlab("Emitters")+
+  ggtitle(paste("Interactions used per ctp [%]", name_yng, "interactome"))+
+  ylim(limits = c(0, 1))
+
+bp_intfrac_yng_rec <- ggplot(ints_frac_yng, 
+                             aes(x = receiver, 
+                                 y = perc_ints_emi, 
+                                 fill = receiver))+
+  geom_boxplot(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Receivers", values = col_rec_red)+
+  ylab("nr ints per ctp/nr possible ints per receiver")+
+  xlab("Receivers")+
+  ggtitle(paste("Interactions used per ctp [%]", name_yng, "interactome"))+
+  ylim(limits = c(0, 1))
+
+bp_intfrac_old_emi <- ggplot(ints_frac_old, 
+                             aes(x = emitter, 
+                                 y = perc_ints_emi, 
+                                 fill = emitter))+
+  geom_boxplot(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Emitters", values = col_emi_red)+
+  ylab("nr ints per ctp/nr possible ints per emitter")+
+  xlab("Emitters")+
+  ggtitle(paste("Interactions used per ctp [%]", name_old, "interactome"))+
+  ylim(limits = c(0, 1))
+
+bp_intfrac_old_rec <- ggplot(ints_frac_old, 
+                             aes(x = receiver, 
+                                 y = perc_ints_emi, 
+                                 fill = receiver))+
+  geom_boxplot(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Receivers", values = col_rec_red)+
+  ylab("nr ints per ctp/nr possible ints per receiver")+
+  xlab("Receivers")+
+  ggtitle(paste("Interactions used per ctp [%]", name_old, "interactome"))+
+  ylim(limits = c(0, 1))
+
+bp_intfrac_yng_emi
+bp_intfrac_yng_rec
+bp_intfrac_old_emi
+bp_intfrac_old_rec
+
+```
+
+## Cell type level
+
+### Nr of interactions
+
+Visualise per age group.
+Histograms.
+
+```{r}
+
+hist_ctints_age <- ggplot(ctints_both, 
+                          aes(x = reorder(celltypes, - nr_ints), 
+                              y = nr_ints, fill = age))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Age", values = col_age)+
+  ylab("Number of possible interactions per cell type")+
+  xlab("Age")+
+  ylim(limits = c(0,max_ctints))+
+  ggtitle(paste(species, "interactome"))
+
+hist_ctints_anno <- ggplot(ctints_both, 
+                          aes(x = celltypes, 
+                              y = nr_ints, fill = annotation))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Annotation", values = col_ann)+
+  ylab("Number of possible interactions per cell type")+
+  xlab("Age")+
+  ylim(limits = c(0,max_ctints))+
+  ggtitle(paste(species, "interactome"))
+
+hist_ctints_anno_age <- ggplot(ctints_both, 
+                          aes(x = celltypes, 
+                              y = nr_ints, fill = annotation))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  scale_fill_manual("Annotation", values = col_ann)+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Number of possible interactions per cell type")+
+  xlab("Age")+
+  ylim(limits = c(0,max_ctints))+
+  ggtitle(paste(species, "interactome"))+
+  facet_grid(cols = vars(age))
+
+hist_ctints_yng_anno <- ggplot(ctints_yng[[1]], 
+                          aes(x = reorder(celltypes, - nr_ints), 
+                              y = nr_ints, fill = annotation))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  scale_fill_manual("Annotation", values = col_ann)+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Number of possible interactions per cell type")+
+  xlab("Age")+
+  ylim(limits = c(0,max_ctints))+
+  ggtitle(paste(name_yng, "interactome"))
+
+hist_ctints_old_anno <- ggplot(ctints_old[[1]], 
+                          aes(x = reorder(celltypes, - nr_ints), 
+                              y = nr_ints, fill = annotation))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  scale_fill_manual("Annotation", values = col_ann)+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Number of possible interactions per cell type")+
+  xlab("Age")+
+  ylim(limits = c(0,max_ctints))+
+  ggtitle(paste(name_old, "interactome"))
+
+
+hist_ctints_age
+hist_ctints_anno
+hist_ctints_anno_age
+hist_ctints_yng_anno
+hist_ctints_old_anno
+
+```
+
+Boxplots.
+
+```{r}
+
+bp_ctints_age <- ggplot(ctints_both, aes(x = age, y = nr_ints, fill = age))+
+  geom_boxplot()+
+  theme_classic()+
+  scale_fill_manual("Age", values = col_age)+
+  ylab("Number of possible interactions per cell type")+
+  xlab("Age")+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, max_ctints))
+
+bp_ctints_anno <- ggplot(ctints_both, 
+                         aes(x = annotation, y = nr_ints, fill = annotation))+
+  geom_boxplot()+
+  theme_classic()+
+  scale_fill_manual("Annotation", values = col_ann)+
+  ylab("Number of possible interactions per cell type")+
+  xlab("Annotation")+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, max_ctints))
+
+bp_ctints_age_anno <- ggplot(ctints_both, 
+                             aes(x = age, y = nr_ints, fill = annotation))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Annotation", values = col_ann)+
+  ylab("Number of possible interactions per cell type")+
+  xlab("Age")+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, max_ctints))
+
+bp_ctints_anno_age <- ggplot(ctints_both, 
+                             aes(x = annotation, y = nr_ints, fill = age))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Age", values = col_age)+
+  ylab("Number of possible interactions per cell type")+
+  xlab("Annotation")+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, max_ctints))
+
+
+bp_ctints_age
+bp_ctints_anno
+bp_ctints_age_anno
+bp_ctints_anno_age
+
+```
+
+Visualise per cell type.
+
+```{r}
+
+barp_ctints_ct <- ggplot(ctints_both, 
+                         aes(x = celltypes, y = nr_ints, 
+                              fill = celltypes))+
+  geom_col()+
+  theme_classic()+
+  scale_fill_manual("Cell types", values = col_cts_red)+
+  ylab("Number of possible interactions per cell type")+
+  xlab("Cell types")+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, max_ctints))+
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "none")
+
+barp_ctints_ct_age <- ggplot(ctints_both, 
+                         aes(x = celltypes, y = nr_ints, 
+                              fill = celltypes))+
+  geom_col()+
+  theme_classic()+
+  scale_fill_manual("Cell types", values = col_cts_red)+
+  ylab("Number of possible interactions per cell type")+
+  xlab("Cell types")+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, max_ctints))+
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "none")+
+  facet_grid(cols = vars(age))
+
+barp_ctints_ct
+barp_ctints_ct_age 
+
+```
+
+## Nr of Ligands/Receptors
+
+```{r}
+
+hist_nrlrs_age <- ggplot(nrlrs_both, 
+                          aes(x = reorder(celltypes, - nr_lrs), 
+                              y = nr_lrs, fill = age))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Age", values = col_age)+
+  ylab("Number of ligands/receptors per cell type")+
+  xlab("Age")+
+  ylim(limits = c(0,800))+
+  ggtitle(paste(species, "interactome"))
+
+hist_nrlrs_anno <- ggplot(nrlrs_both, 
+                          aes(x = celltypes, 
+                              y = nr_lrs, fill = annotation))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Annotation", values = col_ann)+
+  ylab("Number of ligands/receptors per cell type")+
+  xlab("Age")+
+  ylim(limits = c(0,800))+
+  ggtitle(paste(species, "interactome"))
+
+hist_nrlrs_anno_age <- ggplot(nrlrs_both, 
+                          aes(x = celltypes, 
+                              y = nr_lrs, fill = annotation))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  scale_fill_manual("Annotation", values = col_ann)+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Number of ligands/receptors per cell type")+
+  xlab("Age")+
+  ylim(limits = c(0,800))+
+  ggtitle(paste(species, "interactome"))+
+  facet_grid(cols = vars(age))
+
+hist_nrlrs_yng_anno <- ggplot(nrlrs_yng, 
+                          aes(x = reorder(celltypes, - nr_lrs), 
+                              y = nr_lrs, fill = annotation))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  scale_fill_manual("Annotation", values = col_ann)+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Number of ligands/receptors per cell type")+
+  xlab("Age")+
+  ylim(limits = c(0,800))+
+  ggtitle(paste(name_yng, "interactome"))
+
+hist_nrlrs_old_anno <- ggplot(nrlrs_old, 
+                          aes(x = reorder(celltypes, - nr_lrs), 
+                              y = nr_lrs, fill = annotation))+
+  geom_col(position = "dodge")+
+  theme_classic()+
+  scale_fill_manual("Annotation", values = col_ann)+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Number of ligands/receptors per cell type")+
+  xlab("Age")+
+  ylim(limits = c(0,800))+
+  ggtitle(paste(name_old, "interactome"))
+
+
+hist_nrlrs_age
+hist_nrlrs_anno
+hist_nrlrs_anno_age
+hist_nrlrs_yng_anno
+hist_nrlrs_old_anno
+
+```
+
+Boxplots.
+
+```{r}
+
+bp_nrlrs_age <- ggplot(nrlrs_both, aes(x = age, y = nr_lrs, fill = age))+
+  geom_boxplot()+
+  theme_classic()+
+  scale_fill_manual("Age", values = col_age)+
+  ylab("Number of ligands/receptors per cell type")+
+  xlab("Age")+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, 800))
+
+bp_nrlrs_anno <- ggplot(nrlrs_both, 
+                         aes(x = annotation, y = nr_lrs, fill = annotation))+
+  geom_boxplot()+
+  theme_classic()+
+  scale_fill_manual("Annotation", values = col_ann)+
+  ylab("Number of ligands/receptors per cell type")+
+  xlab("Annotation")+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, 800))
+
+bp_nrlrs_age_anno <- ggplot(nrlrs_both, 
+                             aes(x = age, y = nr_lrs, fill = annotation))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Annotation", values = col_ann)+
+  ylab("Number of ligands/receptors per cell type")+
+  xlab("Age")+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, 800))
+
+bp_nrlrs_anno_age <- ggplot(nrlrs_both, 
+                             aes(x = annotation, y = nr_lrs, fill = age))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_manual("Age", values = col_age)+
+  ylab("Number of ligands/receptors per cell type")+
+  xlab("Annotation")+
+  ggtitle(paste(species, "interactome"))+
+  ylim(limits = c(0, 800))
+
+
+bp_nrlrs_age
+bp_nrlrs_anno
+bp_nrlrs_age_anno
+bp_nrlrs_anno_age
+
+```
+
+Visualise per cell type.
+
+```{r}
+
+barp_nrlrs_ct <- ggplot(nrlrs_both, 
+                         aes(x = celltypes, y = nr_lrs, 
+                              fill = celltypes))+
+  geom_col()+
+  theme_classic()+
+  scale_fill_manual("Cell types", values = col_cts_red)+
+  ylab("Number of ligands/receptors per cell type")+
+  xlab("Cell types")+
+  ggtitle(paste(species, "interactome"))+
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "none")+
+  ylim(limits = c(0, 800))
+
+barp_nrlrs_ct_age <- ggplot(nrlrs_both, 
+                         aes(x = celltypes, y = nr_lrs, 
+                              fill = celltypes))+
+  geom_col()+
+  theme_classic()+
+  scale_fill_manual("Cell types", values = col_cts_red)+
+  ylab("Number of ligands/receptors per cell type")+
+  xlab("Cell types")+
+  ggtitle(paste(species, "interactome"))+
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "none")+
+  facet_grid(cols = vars(age))+
+  ylim(limits = c(0, 800))
+
+barp_nrlrs_ct
+barp_nrlrs_ct_age 
+
+```
+
+## Nr of cells
+
+For interactions by cell type.
+
+```{r}
+
+pt_ctints_nrc_yng <- ggplot(ctints_yng$overview,
+                             aes(x = nr_cells, y = nr_ints, color = annotation))+
+  geom_point(size = 2)+
+  theme_classic()+
+  xlab("Number of cells per cell type")+
+  ylab("Number of possible interactions per cell type")+
+  scale_color_manual("Annotation", values = col_ann)+
+  scale_x_continuous(limits = c(0, max_nrcells))+
+  scale_y_continuous(limits = c(0, max_ctints))+
+  ggtitle(paste(name_yng, "interactome"))
+
+pt_ctints_nrc_old <- ggplot(ctints_old$overview,
+                             aes(x = nr_cells, y = nr_ints, color = annotation))+
+  geom_point(size = 2)+
+  theme_classic()+
+  xlab("Number of cells per cell type")+
+  ylab("Number of possible interactions per cell type")+
+  scale_color_manual("Annotation", values = col_ann)+
+  scale_x_continuous(limits = c(0, max_nrcells))+
+  scale_y_continuous(limits = c(0, max_ctints))+
+  ggtitle(paste(name_old, "interactome"))
+
+pt_ctints_nrc_yng
+pt_ctints_nrc_old
+
+```
+
+For nr of ligands/receptors by cell type.
+
+```{r}
+
+pt_nrlrs_nrc_yng <- ggplot(nrlrs_yng,
+                             aes(x = nr_cells, y = nr_lrs, color = annotation))+
+  geom_point(size = 2)+
+  theme_classic()+
+  xlab("Number of cells per cell type")+
+  ylab("Number of ligands/receptors per cell type")+
+  scale_color_manual("Annotation", values = col_ann)+
+  scale_x_continuous(limits = c(0, max_nrcells))+
+  scale_y_continuous(limits = c(0, 800))+
+  ggtitle(paste(name_yng, "interactome"))
+
+pt_nrlrs_nrc_old <- ggplot(nrlrs_old,
+                             aes(x = nr_cells, y = nr_lrs, color = annotation))+
+  geom_point(size = 2)+
+  theme_classic()+
+  xlab("Number of cells per cell type")+
+  ylab("Number of per cell type pair")+
+  scale_color_manual("Annotation", values = col_ann)+
+  scale_x_continuous(limits = c(0, max_nrcells))+
+  scale_y_continuous(limits = c(0, 800))+
+  ggtitle(paste(name_old, "interactome"))
+
+pt_nrlrs_nrc_yng
+pt_nrlrs_nrc_old
+
+```
+
+## Score
+
+### ctints
+
+Reuse the ints_frac dataframes for convenience.
+
+```{r}
+
+pos_match_yng <- match(ints_score_yng$ct_pair, ints_frac_yng$ct_pairs)
+pos_match_old <- match(ints_score_old$ct_pair, ints_frac_old$ct_pairs)
+
+ints_score_yng$emitter <- ints_frac_yng$emitter[pos_match_yng]
+ints_score_yng$receiver <- ints_frac_yng$receiver[pos_match_yng]
+ints_score_yng$nr_ints_emitter <- ints_frac_yng$nr_ints_emitter[pos_match_yng]
+ints_score_yng$nr_ints_receiver <- ints_frac_yng$nr_ints_receiver[pos_match_yng]
+
+ints_score_yng$emitter <- factor(ints_score_yng$emitter, 
+                                 levels = names(col_emi_red))
+ints_score_yng$receiver <- factor(ints_score_yng$receiver, 
+                                 levels = names(col_rec_red))
+
+ints_score_old$emitter <- ints_frac_old$emitter[pos_match_old]
+ints_score_old$receiver <- ints_frac_old$receiver[pos_match_old]
+ints_score_old$nr_ints_emitter <- ints_frac_old$nr_ints_emitter[pos_match_old]
+ints_score_old$nr_ints_receiver <-ints_frac_old$nr_ints_receiver[pos_match_old]
+
+ints_score_old$emitter <- factor(ints_score_old$emitter, 
+                                 levels = names(col_emi_red))
+ints_score_old$receiver <- factor(ints_score_old$receiver, 
+                                 levels = names(col_rec_red))
+```
+
+```{r}
+
+ints_score_yng_emi <- ggplot(ints_score_yng, 
+                             aes(x = emitter,
+                                 y = score, fill = nr_ints_emitter))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_continuous("Nr possible ints/ct", limits = c(0, max_ctints))+
+  ylab("LRI Score")+
+  xlab("Cell type pair")+
+  ggtitle(paste(name_yng, "interactome"))+
+  ylim(limits = c(0,1))
+
+ints_score_yng_rec <- ggplot(ints_score_yng, 
+                             aes(x = receiver, 
+                                 y = score, fill = nr_ints_receiver))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_continuous("Nr possible ints/ct", limits = c(0, max_ctints))+
+  ylab("LRI Score")+
+  xlab("Cell type pair")+
+  ggtitle(paste(name_yng, "interactome"))+
+  ylim(limits = c(0,1))
+
+ints_score_old_emi <- ggplot(ints_score_old, 
+                             aes(x = emitter,
+                                 y = score, fill = nr_ints_emitter))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_continuous("Nr possible ints/ct", limits = c(0, max_ctints))+
+  ylab("LRI Score")+
+  xlab("Cell type pair")+
+  ggtitle(paste(name_old, "interactome"))+
+  ylim(limits = c(0,1))
+
+ints_score_old_rec <- ggplot(ints_score_old, 
+                             aes(x = receiver, 
+                                 y = score, fill = nr_ints_receiver))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_continuous("Nr possible ints/ct", limits = c(0, max_ctints))+
+  ylab("LRI Score")+
+  xlab("Cell type pair")+
+  ggtitle(paste(name_old, "interactome"))+
+  ylim(limits = c(0,1))
+
+
+ints_score_yng_emi
+ints_score_yng_rec
+ints_score_old_emi
+ints_score_old_rec
+
+```
+
+### nr of cells
+
+```{r}
+
+# young 
+ints_score_yng$nr_cells_emitter <- ctints_yng$overview$nr_cells[match(
+  ints_score_yng$emitter, ctints_yng$overview$celltypes)]
+ints_score_yng$nr_cells_receiver <- ctints_yng$overview$nr_cells[match(
+  ints_score_yng$receiver, ctints_yng$overview$celltypes)]
+
+# old 
+ints_score_old$nr_cells_emitter <- ctints_old$overview$nr_cells[match(
+  ints_score_old$emitter, ctints_old$overview$celltypes)]
+ints_score_old$nr_cells_receiver <- ctints_old$overview$nr_cells[match(
+  ints_score_old$receiver, ctints_old$overview$celltypes)]
+
+```
+
+```{r}
+
+nrc_score_yng_emi <- ggplot(ints_score_yng, 
+                             aes(x = reorder(emitter, nr_cells_emitter),
+                                 y = score, fill = nr_cells_emitter))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_continuous("Nr of cells", limits = c(0, max_nrcells))+
+  ylab("LRI Score")+
+  xlab("Cell type")+
+  ggtitle(paste(name_yng, "interactome"))+
+  ylim(limits = c(0,1))
+
+nrc_score_yng_rec <- ggplot(ints_score_yng, 
+                             aes(x = reorder(receiver, nr_cells_receiver),
+                                 y = score, fill = nr_cells_receiver))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_continuous("Nr of cells", limits = c(0, max_nrcells))+
+  ylab("LRI Score")+
+  xlab("Cell type")+
+  ggtitle(paste(name_yng, "interactome"))+
+  ylim(limits = c(0,1))
+
+nrc_score_old_emi <- ggplot(ints_score_old, 
+                             aes(x = reorder(emitter, nr_cells_emitter),
+                                 y = score, fill = nr_cells_emitter))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_continuous("Nr of cells", limits = c(0, max_nrcells))+
+  ylab("LRI Score")+
+  xlab("Cell type pair")+
+  ggtitle(paste(name_old, "interactome"))+
+  ylim(limits = c(0,1))
+
+nrc_score_old_rec <- ggplot(ints_score_old, 
+                             aes(x = reorder(receiver, nr_cells_receiver),
+                                 y = score, fill = nr_cells_receiver))+
+  geom_boxplot()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_fill_continuous("Nr of cells", limits = c(0, max_nrcells))+
+  ylab("LRI Score")+
+  xlab("Cell type pair")+
+  ggtitle(paste(name_old, "interactome"))+
+  ylim(limits = c(0,1))
+
+nrc_score_yng_emi
+nrc_score_yng_rec
+nrc_score_old_emi
+nrc_score_old_rec
+
+```
+

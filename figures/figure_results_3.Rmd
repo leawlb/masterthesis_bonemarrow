@@ -1,0 +1,344 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+"Rank and score variability"
+
+This script requires the environment from cpi_interactions_yng_vs_old_mmus_cpi
+
+# Figure Parts
+
+## A
+
+This requires loaded cpi_interactions_yng_vs_old
+
+Ligand and receptor ranking variability.
+
+```{r}
+
+plot_a1 <- plot_ligands
+plot_a2 <- plot_receptors
+
+plot_a1
+plot_a2
+
+```
+
+## B 
+
+Receptor/Ligand variability
+
+```{r}
+
+plot_b1 <- plot_ligand_var
+plot_b2 <- plot_receptor_var
+
+plot_b1
+plot_b2
+
+```
+
+## C
+
+Nr of shared ligands/receptors
+
+```{r}
+
+plot_c1 <- ggplot(perc_all_lig, aes(x = age, y = percent, color = age))+
+  geom_boxplot()
+
+plot_c2 <- ggplot(perc_all_rec, aes(x = age, y = percent, color = age))+
+  geom_boxplot()
+
+plot_c1
+plot_c2
+
+```
+
+## D 
+
+LRI score distribution of four selected cell types
+
+```{r}
+
+plot_d1 <- plot_list_HM$`Fibro/Chondro progs`
+plot_d2 <- plot_list_HM_leg$`Endosteal fibros`
+plot_d3 <- plot_list_HM$`LT-HSCs`
+plot_d4 <- plot_list_HM_leg$`Megakaryocyte progs`
+
+plot_d1
+plot_d2
+plot_d3
+plot_d4
+
+```
+
+
+
+# Uniform Formatting
+
+```{r}
+
+plot_A1 <- plot_a1 + 
+  ggtitle("Ligand ranks")+
+  theme(plot.title = element_text(size = 14, face = "bold"))
+
+plot_A2 <- plot_a2 + 
+  ggtitle("Receptor ranks")+
+  theme(plot.title = element_text(size = 14, face = "bold"))
+
+plot_A1
+plot_A2
+
+```
+
+
+
+```{r}
+
+plot_B1 <- plot_b1+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_manual("Age", values = col_age)+
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x =element_blank())+
+   ylab(expression(atop("Ligand rank variance",
+                       paste("across emitters"))))+
+  xlab("Age")+
+  ggtitle("Ligand repertoire")
+
+plot_B1_leg1 <- ggplot(rec_var, aes(x = age, y = var, color = age))+
+  geom_quasirandom(size = 2.5)+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_manual("Age", values = col_age)
+
+
+legend_B1 <- get_legend(plot_B1_leg1)
+
+plot_B1+ theme(legend.position = "none")
+
+
+```
+
+```{r}
+
+plot_B2 <- plot_b2+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_manual("Age", values = col_age)+
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x =element_blank())+
+ ylab(expression(atop("Receptor rank variance",
+                       paste("across receivers"))))+  xlab("Age")+
+  ggtitle("Receptor repertoire")
+
+plot_B2+ theme(legend.position = "none")
+
+```
+
+
+
+```{r}
+
+plot_C1 <- plot_c1+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_manual("Age", values = col_age)+
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x =element_blank())+
+   ylab(expression(atop("Shared ligands/total",
+                       paste("ligands per emitter [%]"))))+
+  xlab("Age")+
+  ggtitle("")+
+  ylim(limits = c(0,100))+
+  stat_compare_means(
+    inherit.aes = TRUE,
+    comparisons = list(c("young", "old")),
+    method = "wilcox.test", paired = FALSE, tip.length = 0, 
+    label = "p.signif", hide.ns = TRUE
+  )
+
+plot_C1+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_C2 <- plot_c2+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_manual("Age", values = col_age)+
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x =element_blank())+
+   ylab(expression(atop("Shared receptors/total",
+                       paste("receptors per receiver [%]"))))+
+  xlab("Age")+
+  ggtitle("")+
+  ylim(limits = c(0,100))+
+  stat_compare_means(
+    inherit.aes = TRUE,
+    comparisons = list(c("young", "old")),
+    method = "wilcox.test", paired = FALSE, tip.length = 0, 
+    label = "p.signif", hide.ns = TRUE
+  )
+
+plot_C2+ theme(legend.position = "none")
+
+```
+
+
+
+```{r}
+
+plot_D1 <- plot_d1+
+  ggtitle("Fibro/Chondro progs")+
+  theme(plot.title = element_text(size = 14, face = "bold"))
+plot_D2 <- plot_d2+
+  ggtitle("Endosteal fibros")+
+  theme(plot.title = element_text(size = 14, face = "bold"))
+plot_D3 <- plot_d3+
+  ggtitle("LT-HSCs")+
+  theme(plot.title = element_text(size = 14, face = "bold"))
+plot_D4 <- plot_d4+
+  ggtitle("Megakaryocyte progs")+
+  theme(plot.title = element_text(size = 14, face = "bold"))
+
+plot_D1
+plot_D2
+plot_D3
+plot_D4
+
+
+```
+
+
+
+
+
+
+
+# Assemble
+
+```{r}
+
+# 17
+figure_3_a <- ggarrange(
+
+  plot_A1,
+  plot_A2
+  
+)
+figure_3_a
+
+ggsave("images/figure_3_a.png",
+  figure_3_a,
+  width = 17*0.787402,
+  height = 6*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+```{r}
+
+figure_3_bc <- ggarrange(
+  
+  ncol = 5,
+  widths = c(3.75, 3.75, 3.75, 3.75, 2),
+  
+  plot_B1+theme(legend.position = "none"),
+  plot_C1+theme(legend.position = "none"),
+
+  plot_B2+theme(legend.position = "none"),
+  plot_C2+theme(legend.position = "none"),
+  legend_B1
+  
+  )
+
+figure_3_bc
+
+ggsave("images/figure_3_bc.png",
+  figure_3_bc,
+  width = 17*0.787402,
+  height = 3.4*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+```{r}
+
+figure_3_d <- ggarrange(
+  
+  ncol = 4,
+  widths = c(3, 6,3.2, 5.8),
+  plot_D1,
+  plot_D2,
+  plot_D3,
+  plot_D4
+)
+
+figure_3_d
+
+ggsave("images/figure_3_d.png",
+  figure_3_d,
+  width = 17*0.787402,
+  height = 6.2*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+
+

@@ -1,0 +1,1303 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+LRI.
+Related to figure results 2.
+
+# Preparation
+
+## Libraries
+
+```{r libraries, message = FALSE}
+
+library(SingleCellExperiment)
+library(rlist)
+library(tidyverse)
+library(eulerr)
+library(gridExtra)
+library(cowplot)
+library(scater)
+library(ggbeeswarm)
+library(ggpubr)
+
+```
+
+## Load
+
+### Code
+
+```{r load_code, message = FALSE}
+
+source(file = "../../code/filepath.R")
+source(file = "../../code/colors.R")
+
+```
+
+### Objects
+
+```{r}
+
+score_df_yng1 <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/ctpints_yng1score_df"))
+
+score_df_yng2 <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/ctpints_yng2score_df"))
+
+score_df_yng3 <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/ctpints_yng3score_df"))
+
+score_df_old2 <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/ctpints_old2score_df"))
+
+score_df_old3 <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/ctpints_old3score_df"))
+
+score_df_both <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmusscore_df_both"))
+
+mmus_yng_sce_ds <- readRDS(file = paste0(
+    filepath_lv1, "data/sce_objects/mmus/mmus_young_SCE_ds"))
+mmus_old_sce_ds <- readRDS(file = paste0(
+    filepath_lv1, "data/sce_objects/mmus/mmus_old_SCE_ds"))
+
+sce_all <- cbind(mmus_yng_sce_ds, mmus_old_sce_ds)
+assays(sce_all)$logcounts <- assays(sce_all)$downsampled
+
+```
+
+## Visualise the ranks of KitlKit and CC
+
+```{r}
+
+ranks_kitlkit_yng1 <- score_df_yng1[score_df_yng1$interaction == "Kitl&Kit",]
+ranks_kitlkit_yng2 <- score_df_yng2[score_df_yng2$interaction == "Kitl&Kit",]
+ranks_kitlkit_yng3 <- score_df_yng3[score_df_yng3$interaction == "Kitl&Kit",]
+
+ranks_kitlkit_yng1$replicate <- "mmus_young1"
+ranks_kitlkit_yng2$replicate <- "mmus_young2"
+ranks_kitlkit_yng3$replicate <- "mmus_young3"
+
+ranks_kitlkit_yng <- rbind(ranks_kitlkit_yng1, 
+                           ranks_kitlkit_yng2, 
+                           ranks_kitlkit_yng3)
+
+ranks_kitlkit_old2 <- score_df_old2[score_df_old2$interaction == "Kitl&Kit",]
+ranks_kitlkit_old3 <- score_df_old3[score_df_old3$interaction == "Kitl&Kit",]
+
+ranks_kitlkit_old2$replicate <- "mmus_old2"
+ranks_kitlkit_old3$replicate <- "mmus_old3"
+
+ranks_kitlkit_old <- rbind(ranks_kitlkit_old2, 
+                           ranks_kitlkit_old3)
+
+```
+
+```{r}
+
+score_df_yng <- score_df_both[score_df_both$age == "young",]
+score_df_old <- score_df_both[score_df_both$age == "old",]
+
+ranks_kitlkit_yng_all <- score_df_yng[score_df_yng$interaction == "Kitl&Kit",]
+ranks_kitlkit_old_all <- score_df_old[score_df_old$interaction == "Kitl&Kit",]
+
+median(ranks_kitlkit_yng_all$ligandrank)
+median(ranks_kitlkit_old_all$ligandrank)
+
+```
+
+
+```{r}
+
+
+ranks_cc_yng1 <- score_df_yng1[score_df_yng1$interaction == "Cxcl12&Cxcr4",]
+ranks_cc_yng2 <- score_df_yng2[score_df_yng2$interaction == "Cxcl12&Cxcr4",]
+ranks_cc_yng3 <- score_df_yng3[score_df_yng3$interaction == "Cxcl12&Cxcr4",]
+
+ranks_cc_yng1$replicate <- "mmus_young1"
+ranks_cc_yng2$replicate <- "mmus_young2"
+ranks_cc_yng3$replicate <- "mmus_young3"
+
+ranks_cc_yng <- rbind(ranks_cc_yng1, ranks_cc_yng2, ranks_cc_yng3)
+
+ranks_cc_old2 <- score_df_old2[score_df_old2$interaction == "Cxcl12&Cxcr4",]
+ranks_cc_old3 <- score_df_old3[score_df_old3$interaction == "Cxcl12&Cxcr4",]
+
+ranks_cc_old2$replicate <- "mmus_old2"
+ranks_cc_old3$replicate <- "mmus_old3"
+
+ranks_cc_old <- rbind(ranks_cc_old2, ranks_cc_old3)
+
+```
+
+```{r}
+
+ranks_cc_yng_all <- score_df_yng[score_df_yng$interaction == "Cxcl12&Cxcr4",]
+ranks_cc_old_all <- score_df_old[score_df_old$interaction == "Cxcl12&Cxcr4",]
+
+
+```
+
+## A
+
+Young Kitl and Kit
+
+```{r}
+
+emi_minmax_yng_kk <- ranks_kitlkit_yng[grep("Baso/Eo/Mast progs", 
+                              ranks_kitlkit_yng$ct_pair),] %>%
+  group_by(emitter) %>%
+  summarise(min = min(ligandrank),
+            max = max(ligandrank),
+            mean = mean(ligandrank))
+
+emi_all_yng_kk <- ranks_kitlkit_yng_all[grep("Baso/Eo/Mast progs", 
+                              ranks_kitlkit_yng_all$ct_pair),]
+
+plot_a1 <- ggplot(emi_all_yng_kk)+
+  geom_col(fill = "black", position = "dodge", aes(x = emitter,
+           y = ligandrank))+
+  geom_pointrange(aes(ymax = emi_minmax_yng_kk$max, 
+                      ymin = emi_minmax_yng_kk$min,
+                      x= emi_minmax_yng_kk$emitter,
+                      y = emi_minmax_yng_kk$mean),
+                  color = col_ann[[1]])+
+  theme_classic()+
+  ylim(limits = c(0, 300))+
+  #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())+
+  ylab("Kitlg rank")+
+  xlab("Emitters")+
+  scale_x_discrete(drop=FALSE)+
+  ggtitle("young")
+
+plot_a1
+
+```
+
+```{r}
+
+rec_minmax_yng_kk <- ranks_kitlkit_yng[grep("Adipo-CARs", 
+                              ranks_kitlkit_yng$ct_pair),] %>%
+  group_by(receiver) %>%
+  summarise(min = min(receptorrank),
+            max = max(receptorrank),
+            mean = mean(receptorrank))
+
+rec_all_yng_kk <- ranks_kitlkit_yng_all[grep("Adipo-CARs", 
+                              ranks_kitlkit_yng_all$ct_pair),]
+
+plot_a2 <- ggplot(rec_all_yng_kk)+
+  geom_col(fill = "black", position = "dodge", aes(x = receiver,
+           y = receptorrank))+
+  geom_pointrange(aes(ymax = rec_minmax_yng_kk$max, 
+                      ymin = rec_minmax_yng_kk$min,
+                      x= rec_minmax_yng_kk$receiver,
+                      y = rec_minmax_yng_kk$mean),
+                  color = col_ann[[2]])+
+  theme_classic()+
+  ylim(limits = c(0, 300))+
+#base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())+
+  ylab("c-Kit rank")+
+  xlab("Receivers")+
+  scale_x_discrete(drop=FALSE)+
+  ggtitle("")
+
+plot_a2
+
+```
+
+## B
+
+Old Kitl and Kit
+
+```{r}
+
+emi_minmax_old_kk <- ranks_kitlkit_old[grep("Baso/Eo/Mast progs", 
+                              ranks_kitlkit_old$ct_pair),] %>%
+  group_by(emitter) %>%
+  summarise(min = min(ligandrank),
+            max = max(ligandrank),
+            mean = mean(ligandrank))
+
+emi_all_old_kk <- ranks_kitlkit_old_all[grep("Baso/Eo/Mast progs", 
+                              ranks_kitlkit_old_all$ct_pair),]
+
+plot_b1 <- ggplot(emi_all_old_kk)+
+  geom_col(fill = "black", position = "dodge", aes(x = emitter,
+           y = ligandrank))+
+  geom_pointrange(aes(ymax = emi_minmax_old_kk$max, 
+                      ymin = emi_minmax_old_kk$min,
+                      x= emi_minmax_old_kk$emitter,
+                      y = emi_minmax_old_kk$mean),
+                  color = col_ann[[1]])+
+  theme_classic()+
+  ylim(limits = c(0, 300))+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())+
+  ylab("Kitlg rank")+
+  xlab("Emitters")+
+  scale_x_discrete(drop=FALSE)+
+  ggtitle("old")
+
+plot_b1
+
+```
+
+```{r}
+
+rec_minmax_old_kk <- ranks_kitlkit_old[grep("Adipo-CARs", 
+                              ranks_kitlkit_old$ct_pair),] %>%
+  group_by(receiver) %>%
+  summarise(min = min(receptorrank),
+            max = max(receptorrank),
+            mean = mean(receptorrank))
+
+rec_all_old_kk <- ranks_kitlkit_old_all[grep("Adipo-CARs", 
+                              ranks_kitlkit_old_all$ct_pair),]
+
+plot_b2 <- ggplot(rec_all_old_kk)+
+  geom_col(fill = "black", position = "dodge", aes(x = receiver,
+           y = receptorrank))+
+  geom_pointrange(aes(ymax = rec_minmax_old_kk$max, 
+                      ymin = rec_minmax_old_kk$min,
+                      x= rec_minmax_old_kk$receiver,
+                      y = rec_minmax_old_kk$mean),
+                  color = col_ann[[2]])+
+  theme_classic()+
+  ylim(limits = c(0, 300))+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())+
+  ylab("c-Kit rank")+
+  xlab("Receivers")+
+  scale_x_discrete(drop=FALSE)+
+  ggtitle("")
+
+plot_b2
+
+```
+
+## C
+
+Young CC
+
+```{r}
+
+emi_minmax_yng <- ranks_cc_yng[grep("Baso/Eo/Mast progs", 
+                              ranks_cc_yng$ct_pair),] %>%
+  group_by(emitter) %>%
+  summarise(min = min(ligandrank),
+            max = max(ligandrank),
+            mean = mean(ligandrank))
+
+emi_all_yng <- ranks_cc_yng_all[grep("Baso/Eo/Mast progs", 
+                              ranks_cc_yng_all$ct_pair),]
+
+plot_c1 <- ggplot(emi_all_yng)+
+  geom_col(fill = "black", position = "dodge", aes(x = emitter,
+           y = ligandrank))+
+  geom_pointrange(aes(ymax = emi_minmax_yng$max, 
+                      ymin = emi_minmax_yng$min,
+                      x= emi_minmax_yng$emitter,
+                      y = emi_minmax_yng$mean),
+                  color = col_ann[[1]])+
+  theme_classic()+
+  ylim(limits = c(0, 300))+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())+
+  ylab("Cxcl12 rank")+
+  xlab("Emitters")+
+  scale_x_discrete(drop=FALSE)+
+  ggtitle("young")
+
+plot_c1
+
+```
+
+```{r}
+
+rec_minmax_yng <- ranks_cc_yng[grep("Adipo-CARs", 
+                              ranks_cc_yng$ct_pair),] %>%
+  group_by(receiver) %>%
+  summarise(min = min(receptorrank),
+            max = max(receptorrank),
+            mean = mean(receptorrank))
+
+rec_all_yng <- ranks_cc_yng_all[grep("Adipo-CARs", 
+                              ranks_cc_yng_all$ct_pair),]
+rec_all_yng <- rbind(rec_all_yng, c(
+  "Adipo-CARs&Erythrocyte progs", "Cxcl12&Cxcr4", 0, "Secreted", "Adipo-CARs",
+  0, "Erythrocyte progs", 0, 0, 0, 0, "young"))
+
+rec_all_yng$receptorrank <- as.numeric(rec_all_yng$receptorrank)
+
+
+plot_c2 <- ggplot(rec_all_yng)+
+  geom_col(fill = "black", position = "dodge", aes(x = receiver,
+           y = receptorrank))+
+  geom_pointrange(aes(ymax = rec_minmax_yng$max, 
+                      ymin = rec_minmax_yng$min,
+                      x= rec_minmax_yng$receiver,
+                      y = rec_minmax_yng$mean),
+                  color = col_ann[[2]])+
+  theme_classic()+
+  ylim(limits = c(0, 300))+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())+
+  ylab("Cxcr4 rank")+
+  xlab("Receivers")+
+  scale_x_discrete(drop=FALSE)+
+  ggtitle("")
+
+plot_c2
+
+
+```
+
+## D
+
+Old CC
+
+```{r}
+
+emi_minmax_old <- ranks_cc_old[grep("Baso/Eo/Mast progs", 
+                              ranks_cc_old$ct_pair),] %>%
+  group_by(emitter) %>%
+  summarise(min = min(ligandrank),
+            max = max(ligandrank),
+            mean = mean(ligandrank))
+
+emi_all_old <- ranks_cc_old_all[grep("Baso/Eo/Mast progs", 
+                              ranks_cc_old_all$ct_pair),]
+
+plot_d1 <- ggplot(emi_all_old)+
+  geom_col(fill = "black", position = "dodge", aes(x = emitter,
+           y = ligandrank))+
+  geom_pointrange(aes(ymax = emi_minmax_old$max, 
+                      ymin = emi_minmax_old$min,
+                      x= emi_minmax_old$emitter,
+                      y = emi_minmax_old$mean),
+                  color = col_ann[[1]])+
+  theme_classic()+
+  ylim(limits = c(0, 300))+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())+
+  ylab("Cxcl12 rank")+
+  xlab("Emitters")+
+  scale_x_discrete(drop=FALSE)+
+  ggtitle("old")
+
+plot_d1
+
+```
+
+```{r}
+
+rec_minmax_old <- ranks_cc_old[grep("Adipo-CARs", 
+                              ranks_cc_old$ct_pair),] %>%
+  group_by(receiver) %>%
+  summarise(min = min(receptorrank),
+            max = max(receptorrank),
+            mean = mean(receptorrank))
+
+rec_all_old <- ranks_cc_old_all[grep("Adipo-CARs", 
+                              ranks_cc_old_all$ct_pair),]
+
+rec_minmax_old <- rbind(rec_minmax_old, c(
+  "Megakaryocyte progs", 0, 0, 0))
+
+rec_minmax_old$max <- as.numeric(rec_minmax_old$max)
+rec_minmax_old$min <- as.numeric(rec_minmax_old$min)
+rec_minmax_old$mean <- as.numeric(rec_minmax_old$mean)
+
+
+
+plot_d2 <- ggplot(rec_all_old)+
+  geom_col(fill = "black", position = "dodge", aes(x = receiver,
+           y = receptorrank))+
+  geom_pointrange(aes(ymax = rec_minmax_old$max, 
+                      ymin = rec_minmax_old$min,
+                      x= rec_minmax_old$receiver,
+                      y = rec_minmax_old$mean),
+                  color = col_ann[[2]])+
+  theme_classic()+
+  ylim(limits = c(0, 300))+
+#base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())+
+  ylab("Cxcr4 rank")+
+  xlab("Receivers")+
+  scale_x_discrete(drop=FALSE)+
+  ggtitle("old")
+
+plot_d2
+
+
+```
+
+
+
+```{r}
+
+plot_a1
+plot_a2
+plot_b1
+plot_b2
+plot_c1
+plot_c2
+plot_d1
+plot_d2
+
+```
+
+## E 
+
+also visualise Angpt1/Tek, Vcam1/Itga4 , Vcam1/Itgb
+
+Angpt1/tek
+
+```{r}
+
+plot_e1 <- ggplot(score_df_yng[score_df_yng$interaction == "Angpt1&Tek",], 
+                  aes(x = percentile, fill = emitter))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_e2 <- ggplot(score_df_yng[score_df_yng$interaction == "Angpt1&Tek",], 
+                  aes(x = percentile, fill = receiver))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_e3 <- ggplot(score_df_old[score_df_old$interaction == "Angpt1&Tek",],
+                  aes(x = percentile, fill = emitter))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_e4 <- ggplot(score_df_old[score_df_old$interaction == "Angpt1&Tek",], 
+                  aes(x = percentile, fill = receiver))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_e1
+plot_e2
+plot_e3
+plot_e4
+
+```
+
+```{r}
+
+plot_e5 <- plotUMAP(sce_all,  colour_by = "Angpt1", point_size = 0.4, 
+                       point_alpha = 1)+
+  scale_color_gradientn("Angpt1 ", colors = c("black", "darkorange3", "orange", "lightgoldenrod"))
+
+plot_e6 <- plotUMAP(sce_all,  colour_by = "Tek", point_size = 0.4, 
+                       point_alpha = 1)+
+  scale_color_gradientn("Tek ", colors = c("black", "darkorange3", "orange", "lightgoldenrod"))
+
+plot_e5
+plot_e6
+
+```
+
+## F
+
+Vcam1 and Itga4
+
+```{r}
+
+plot_f1 <- ggplot(score_df_yng[score_df_yng$interaction == "Vcam1&Itga4",], 
+                  aes(x = percentile, fill = emitter))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_f2 <- ggplot(score_df_yng[score_df_yng$interaction == "Vcam1&Itga4",], 
+                  aes(x = percentile, fill = receiver))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_f3 <- ggplot(score_df_old[score_df_old$interaction == "Vcam1&Itga4",],
+                  aes(x = percentile, fill = emitter))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_f4 <- ggplot(score_df_old[score_df_old$interaction == "Vcam1&Itga4",], 
+                  aes(x = percentile, fill = receiver))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_f1
+plot_f2
+plot_f3
+plot_f4
+
+```
+
+```{r}
+
+plot_f5 <- plotUMAP(sce_all,  colour_by = "Vcam1", point_size = 0.4, 
+                       point_alpha = 1)+
+  scale_color_gradientn("Vcam1 ", colors = c("black", "darkorange3", "orange", "lightgoldenrod"))
+
+plot_f6 <- plotUMAP(sce_all,  colour_by = "Itga4", point_size = 0.4, 
+                       point_alpha = 1)+
+  scale_color_gradientn("Itga4 ", colors = c("black", "darkorange3", "orange", "lightgoldenrod"))
+
+plot_f5
+plot_f6
+
+```
+
+## G
+
+Vcam1 and Itga4
+
+```{r}
+
+plot_g1 <- ggplot(score_df_yng[score_df_yng$interaction == "Vcam1&Itgb1",], 
+                  aes(x = percentile, fill = emitter))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_g2 <- ggplot(score_df_yng[score_df_yng$interaction == "Vcam1&Itgb1",], 
+                  aes(x = percentile, fill = receiver))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_g3 <- ggplot(score_df_old[score_df_old$interaction == "Vcam1&Itgb1",],
+                  aes(x = percentile, fill = emitter))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_g4 <- ggplot(score_df_old[score_df_old$interaction == "Vcam1&Itgb1",], 
+                  aes(x = percentile, fill = receiver))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_g1
+plot_g2
+plot_g3
+plot_g4
+
+```
+
+```{r}
+
+plot_g5 <- plotUMAP(sce_all,  colour_by = "Vcam1", point_size = 0.4, 
+                       point_alpha = 1)+
+  scale_color_gradientn("Vcam1 ", colors = c("black", "darkorange3", "orange", "lightgoldenrod"))
+
+plot_g6 <- plotUMAP(sce_all,  colour_by = "Itgb1", point_size = 0.4, 
+                       point_alpha = 1)+
+  scale_color_gradientn("Itgb1 ", colors = c("black", "darkorange3", "orange", "lightgoldenrod"))
+
+plot_g5
+plot_g6
+
+```
+
+# Pretty formatting
+
+```{r}
+
+plot_E1 <- plot_e1+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Emitters", values = col_emi_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab("Angpt1&Tek score percentile")+
+  ggtitle("young")
+
+plot_E_leg1 <- plot_e1+
+  #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    scale_fill_manual("Emitters", values = col_emi_red)
+
+
+legend_E1 <- get_legend(plot_E_leg1)
+
+plot_E1+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_E2 <- plot_e2+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Receivers", values = col_rec_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab("Angpt1&Tek score percentile")+
+  ggtitle("")
+
+plot_E_leg2 <- plot_e2+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    scale_fill_manual("Receivers", values = col_rec_red)
+
+
+legend_E2 <- get_legend(plot_E_leg2)
+
+plot_E2+ theme(legend.position = "none")
+
+```
+
+
+```{r}
+
+plot_E3 <- plot_e3+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Emitters", values = col_emi_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab("Angpt1&Tek score percentile")+
+  ggtitle("old")
+
+plot_E3+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_E4 <- plot_e4+
+#base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Receivers", values = col_rec_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab("Angpt1&Tek score percentile")+
+  ggtitle("")
+
+plot_E4+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_E5 <- plot_e5+
+#base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank())
+
+plot_E6 <- plot_e6+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank())
+
+plot_E5
+plot_E6
+
+```
+
+
+
+
+
+```{r}
+
+plot_F1 <- plot_f1+
+#base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Emitters", values = col_emi_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab("Vcam1&Itga4 score percentile")+
+  ggtitle("young")
+
+plot_F1+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_F2 <- plot_f2+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Receivers", values = col_rec_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab("Vcam1&Itga4 score percentile")+
+  ggtitle("")
+
+plot_F2+ theme(legend.position = "none")
+
+```
+
+
+```{r}
+
+plot_F3 <- plot_f3+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Emitters", values = col_emi_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab("Vcam1&Itga4 score percentile")+
+  ggtitle("old")
+
+plot_F3+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_F4 <- plot_f4+
+  #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Receivers", values = col_rec_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab("Vcam1&Itga4 score percentile")+
+  ggtitle("")
+
+plot_F4+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_F5 <- plot_f5+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank())
+
+plot_F6 <- plot_f6+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank())
+
+plot_F5
+plot_F6
+
+```
+
+
+
+
+```{r}
+
+plot_G1 <- plot_g1+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Emitters", values = col_emi_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab("Vcam1&Itgb1 score percentile")+
+  ggtitle("young")
+
+plot_G1+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_G2 <- plot_g2+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Receivers", values = col_rec_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab("Vcam1&Itgb1 score percentile")+
+  ggtitle("")
+
+plot_G2+ theme(legend.position = "none")
+
+```
+
+
+```{r}
+
+plot_G3 <- plot_g3+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Emitters", values = col_emi_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab("Vcam1&Itgb1 score percentile")+
+  ggtitle("old")
+
+plot_G3+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_G4 <- plot_g4+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Receivers", values = col_rec_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab("Vcam1&Itgb1 score percentile")+
+  ggtitle("")
+
+plot_G4+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_G5 <- plot_g5+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank())
+
+plot_G6 <- plot_g6+
+#base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank())
+
+plot_G5
+plot_G6
+
+```
+
+
+
+
+
+
+
+
+# Assemble
+
+```{r}
+
+figure_s3_ab <- ggarrange(
+  ncol = 4,
+  plot_a1,
+  plot_a2,
+  plot_b1,
+  plot_b2
+)
+
+figure_s3_ab
+
+ggsave("images/figure_s3_ab.png",
+  figure_s3_ab,
+  width = 17*0.787402,
+  height = 3.5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+
+```
+
+```{r}
+
+
+figure_s3_cd <- ggarrange(
+  ncol = 4,
+  plot_c1,
+  plot_c2,
+  plot_d1,
+  plot_d2
+)
+
+figure_s3_cd
+
+ggsave("images/figure_s3_cd.png",
+  figure_s3_cd,
+  width = 17*0.787402,
+  height = 3.5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+#25 -7 = 18
+
+```
+
+```{r}
+
+figure_s3_e <- ggarrange(
+  ncol = 4,
+  plot_E1+theme(legend.position = "none"),
+  plot_E2+theme(legend.position = "none"),
+  plot_E3+theme(legend.position = "none"),
+  plot_E4+theme(legend.position = "none")
+  
+)
+
+figure_s3_e
+
+ggsave("images/figure_s3_e.png",
+  figure_s3_e,
+  width = 14.5*0.787402,
+  height = 3.5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+```{r}
+
+
+figure_s3_f <- ggarrange(
+  ncol = 4,
+  plot_F1+theme(legend.position = "none"),
+  plot_F2+theme(legend.position = "none"),
+  plot_F3+theme(legend.position = "none"),
+  plot_F4+theme(legend.position = "none")
+  
+)
+
+figure_s3_f
+
+ggsave("images/figure_s3_f.png",
+  figure_s3_f,
+  width = 14.5*0.787402,
+  height = 3.5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+```{r}
+
+
+figure_s3_g <- ggarrange(
+  ncol = 4,
+  plot_G1+theme(legend.position = "none"),
+  plot_G2+theme(legend.position = "none"),
+  plot_G3+theme(legend.position = "none"),
+  plot_G4+theme(legend.position = "none")
+  
+)
+
+figure_s3_g
+
+ggsave("images/figure_s3_g.png",
+  figure_s3_g,
+  width = 14.5*0.787402,
+  height = 3.5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+```{r}
+
+
+figure_s3_legemi <- ggarrange(
+  legend_E1
+)
+
+figure_s3_legemi
+
+ggsave("images/figure_s3_legemi.png",
+  figure_s3_legemi,
+  width = 2.5*0.787402,
+  height = 4*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+figure_s3_legrec <- ggarrange(
+  legend_E2
+)
+
+figure_s3_legrec
+
+ggsave("images/figure_s3_legrec.png",
+  figure_s3_legrec,
+  width = 2.5*0.787402,
+  height = 4.5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+```{r}
+
+figure_s3_h <- ggarrange(
+  ncol = 5,
+  plot_E5,
+  plot_E6,
+  plot_F5,
+  plot_F6,
+  plot_G6
+)
+
+figure_s3_h
+
+ggsave("images/figure_s3_h.png",
+  figure_s3_h,
+  width = 17*0.787402,
+  height = 3.5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+

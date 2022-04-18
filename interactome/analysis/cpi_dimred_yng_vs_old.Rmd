@@ -1,0 +1,781 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script visualises PCA and other reduced dimensions for two cpi objects 
+from YOUNG and OLD datasets of THE SAME SPECIES.
+
+Replace the file path to load objects from different species.
+
+# Preparation
+
+## Libraries
+
+```{r libraries, message = FALSE}
+
+library(SingleCellExperiment)
+library(rlist)
+library(tidyverse)
+
+#library(scran)
+#library(ggpubr)
+#library(scater)
+#library(data.table)
+
+```
+
+## Load
+
+### Code
+
+```{r load_code, message = FALSE}
+
+setwd("/home/l012t/Interspecies_BM")
+
+source(file = "code/filepath.R")
+source(file = "code/colors.R")
+
+```
+
+### Objects
+
+Adjust the file paths to load objects from different species. 
+After this, nothing needs to be changed.
+
+```{r}
+
+# merged and pre-processed SCE objects
+sce_yng <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_young_SCE"))
+sce_old <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_old_SCE"))
+
+# corresponding cpi objects
+cpi_yng <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng_cpi_pca"))
+cpi_old <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old_cpi_pca"))
+
+# merged cpi object
+
+cpi_merged <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_cpi_pca"))
+
+# corresponging metrics objects
+ctpints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctpints"))
+ctints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctints"))
+nrlrs_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nrlrs"))
+
+ctpints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctpints"))
+ctints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctints"))
+nrlrs_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nrlrs"))
+
+name_yng <- "mmus_yng"
+name_old <- "mmus_old"
+species <- "mmus"
+
+max_ctpints <- 500
+max_ctints <- 1500
+max_nrcells <- 10000
+
+```
+
+Merge overview dfs for direct comparion between age groups.
+This time, ordering by alphabet BEFORE merging is crucial.
+
+```{r}
+
+ctpints_yng[[1]]$ct_pairs <- paste0(ctpints_yng[[1]]$ct_pairs, "_yng")
+ctpints_yng_tm <- ctpints_yng[[1]][order(ctpints_yng[[1]]$ct_pairs),]
+
+ctpints_old[[1]]$ct_pairs <- paste0(ctpints_old[[1]]$ct_pairs, "_old")
+ctpints_old_tm <- ctpints_old[[1]][order(ctpints_old[[1]]$ct_pairs),]
+
+ctpints_both <- rbind(ctpints_yng_tm, ctpints_old_tm)
+
+ctpints_both$age <- factor(ctpints_both$age, levels = c("young", "old"))
+ctpints_both$emitter <- factor(ctpints_both$emitter, 
+                               levels = names(col_emi_red))
+ctpints_both$receiver <- factor(ctpints_both$receiver, 
+                               levels = names(col_rec_red))
+
+
+```
+
+```{r}
+
+ctints_yng[[1]]$celltypes <- paste0(ctints_yng[[1]]$celltypes, "_yng")
+ctints_yng_tm <- ctints_yng[[1]][order(ctints_yng[[1]]$celltypes),]
+
+ctints_old[[1]]$celltypes <- paste0(ctints_old[[1]]$celltypes, "_old")
+ctints_old_tm <- ctints_old[[1]][order(ctints_old[[1]]$celltypes),]
+
+ctints_both <- rbind(ctints_yng_tm, ctints_old_tm)
+
+ctints_both$age <- factor(ctints_both$age, levels = c("young", "old"))
+
+```
+
+```{r}
+
+nrlrs_yng$celltypes <- paste0(nrlrs_yng$celltypes, "_yng")
+nrlrs_yng_tm <- nrlrs_yng[order(nrlrs_yng$celltypes),]
+
+nrlrs_old$celltypes <- paste0(nrlrs_old$celltypes, "_old")
+nrlrs_old_tm <- nrlrs_old[order(nrlrs_old$celltypes),]
+
+nrlrs_both <- rbind(nrlrs_yng_tm, nrlrs_old_tm)
+
+nrlrs_both$age <- factor(nrlrs_both$age, levels = c("young", "old"))
+
+```
+
+# Analysis
+
+## Age
+
+### Separate objects
+
+```{r}
+
+age_12_yng <- ggplot(cpi_yng$PCA[1:(nrow(cpi_yng$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 2 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  ggtitle(paste(name_yng, "interactome PCA"))
+
+age_13_yng <- ggplot(cpi_yng$PCA[1:(nrow(cpi_yng$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.3))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  ggtitle(paste(name_yng, "interactome PCA"))
+  
+age_23_yng <- ggplot(cpi_yng$PCA[1:(nrow(cpi_yng$PCA)-1),], 
+                 aes(x = Dim.2, y = Dim.3))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 2 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  ggtitle(paste(name_yng, "interactome PCA"))
+  
+age_12_yng
+age_13_yng
+age_23_yng
+
+```
+
+```{r}
+
+age_12_old <- ggplot(cpi_old$PCA[1:(nrow(cpi_old$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2))+
+  geom_point(size = 1.5, color = col_age[2])+
+  theme_classic()+
+  ylab(paste("Component 2 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  ggtitle(paste(name_old, "interactome PCA"))
+
+age_13_old <- ggplot(cpi_old$PCA[1:(nrow(cpi_old$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.3))+
+  geom_point(size = 1.5, color = col_age[2])+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  ggtitle(paste(name_old, "interactome PCA"))
+  
+age_23_old <- ggplot(cpi_old$PCA[1:(nrow(cpi_old$PCA)-1),], 
+                 aes(x = Dim.2, y = Dim.3))+
+  geom_point(size = 1.5, color = col_age[2])+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 2 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  ggtitle(paste(name_old, "interactome PCA"))
+  
+age_12_old
+age_13_old
+age_23_old
+
+```
+
+### Merged object
+
+### Visualise Age
+
+```{r}
+
+age_12 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, colour = cpi_merged$Celltypes$Age))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 2 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Age", values = col_age)+
+  ggtitle(paste(species, "interactome PCA"))
+
+age_13 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.3, colour = cpi_merged$Celltypes$Age))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Age", values = col_age)+
+  ggtitle(paste(species, "interactome PCA"))
+  
+age_23 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.2, y = Dim.3, colour = cpi_merged$Celltypes$Age))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 2 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Age", values = col_age)+
+  ggtitle(paste(species, "interactome PCA"))
+  
+age_12
+age_13
+age_23
+
+```
+
+## Emitters
+
+### Separate objects
+
+```{r}
+
+emi_12_yng <- ggplot(cpi_yng$PCA[1:(nrow(cpi_yng$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, colour = cpi_yng$Celltypes$emitter))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 2 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Emitter", values = col_emi_red)+
+  ggtitle(paste(name_yng, "interactome PCA"))
+
+emi_13_yng <- ggplot(cpi_yng$PCA[1:(nrow(cpi_yng$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.3, colour = cpi_yng$Celltypes$emitter))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Emitter", values = col_emi_red)+
+  ggtitle(paste(name_yng, "interactome PCA"))
+  
+emi_23_yng <- ggplot(cpi_yng$PCA[1:(nrow(cpi_yng$PCA)-1),], 
+                 aes(x = Dim.2, y = Dim.3, colour = cpi_yng$Celltypes$emitter))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 2 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Emitter", values = col_emi_red)+
+  ggtitle(paste(name_yng, "interactome PCA"))
+  
+emi_12_yng
+emi_13_yng
+emi_23_yng
+
+```
+
+```{r}
+
+emi_12_old <- ggplot(cpi_old$PCA[1:(nrow(cpi_old$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, colour = cpi_old$Celltypes$emitter))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 2 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Emitter", values = col_emi_red)+
+  ggtitle(paste(name_old, "interactome PCA"))
+
+emi_13_old <- ggplot(cpi_old$PCA[1:(nrow(cpi_old$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.3, colour = cpi_old$Celltypes$emitter))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Emitter", values = col_emi_red)+
+  ggtitle(paste(name_old, "interactome PCA"))
+  
+emi_23_old <- ggplot(cpi_old$PCA[1:(nrow(cpi_old$PCA)-1),], 
+                 aes(x = Dim.2, y = Dim.3, colour = cpi_old$Celltypes$emitter))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 2 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Emitter", values = col_emi_red)+
+  ggtitle(paste(name_old, "interactome PCA"))
+  
+emi_12_old
+emi_13_old
+emi_23_old
+
+```
+
+### Merged object
+
+```{r}
+
+emi_12 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, colour = cpi_merged$Celltypes$emitter))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 2 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Emitter", values = col_emi_red)+
+  ggtitle(paste(species, "interactome PCA"))
+
+emi_13 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.3, colour = cpi_merged$Celltypes$emitter))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Emitter", values = col_emi_red)+
+  ggtitle(paste(species, "interactome PCA"))
+  
+emi_23 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.2, y = Dim.3, colour = cpi_merged$Celltypes$emitter))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 2 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Emitter", values = col_emi_red)+
+  ggtitle(paste(species, "interactome PCA"))
+  
+emi_12
+emi_13
+emi_23
+
+```
+
+## Receivers
+
+### Separate objects
+
+```{r}
+
+rec_12_yng <- ggplot(cpi_yng$PCA[1:(nrow(cpi_yng$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, colour = cpi_yng$Celltypes$receiver))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 2 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("receiver", values = col_rec_red)+
+  ggtitle(paste(name_yng, "interactome PCA"))
+
+rec_13_yng <- ggplot(cpi_yng$PCA[1:(nrow(cpi_yng$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.3, colour = cpi_yng$Celltypes$receiver))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("receiver", values = col_rec_red)+
+  ggtitle(paste(name_yng, "interactome PCA"))
+  
+rec_23_yng <- ggplot(cpi_yng$PCA[1:(nrow(cpi_yng$PCA)-1),], 
+                 aes(x = Dim.2, y = Dim.3, colour = cpi_yng$Celltypes$receiver))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 2 [", round(cpi_yng$PCA[nrow(cpi_yng$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("receiver", values = col_rec_red)+
+  ggtitle(paste(name_yng, "interactome PCA"))
+  
+rec_12_yng
+rec_13_yng
+rec_23_yng
+
+```
+
+```{r}
+
+rec_12_old <- ggplot(cpi_old$PCA[1:(nrow(cpi_old$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, colour = cpi_old$Celltypes$receiver))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 2 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("receiver", values = col_rec_red)+
+  ggtitle(paste(name_old, "interactome PCA"))
+
+rec_13_old <- ggplot(cpi_old$PCA[1:(nrow(cpi_old$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.3, colour = cpi_old$Celltypes$receiver))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("receiver", values = col_rec_red)+
+  ggtitle(paste(name_old, "interactome PCA"))
+  
+rec_23_old <- ggplot(cpi_old$PCA[1:(nrow(cpi_old$PCA)-1),], 
+                 aes(x = Dim.2, y = Dim.3, colour = cpi_old$Celltypes$receiver))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 2 [", round(cpi_old$PCA[nrow(cpi_old$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("receiver", values = col_rec_red)+
+  ggtitle(paste(name_old, "interactome PCA"))
+  
+rec_12_old
+rec_13_old
+rec_23_old
+
+```
+
+### Merged object
+
+```{r}
+
+rec_12 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, colour = cpi_merged$Celltypes$receiver))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 2 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("receiver", values = col_rec_red)+
+  ggtitle(paste(species, "interactome PCA"))
+
+rec_13 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.3, colour = cpi_merged$Celltypes$receiver))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("receiver", values = col_rec_red)+
+  ggtitle(paste(species, "interactome PCA"))
+  
+rec_23 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.2, y = Dim.3, colour = cpi_merged$Celltypes$receiver))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 2 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("receiver", values = col_rec_red)+
+  ggtitle(paste(species, "interactome PCA"))
+  
+rec_12
+rec_13
+rec_23
+
+```
+
+## Quality Metrics
+
+### Nr of Interactions per cell type pair
+
+```{r}
+
+ints_ctp_12 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     colour = ctpints_both$nr_ints))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 2 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_continuous("Interactions/cell type pair", 
+                         limits = c(0, max_ctpints))+
+  ggtitle(paste(species, "interactome PCA"))
+
+ints_ctp_13 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.3, 
+                     colour = ctpints_both$nr_ints))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_continuous("Interactions/cell type pair", 
+                         limits = c(0, max_ctpints))+
+  ggtitle(paste(species, "interactome PCA"))
+  
+ints_ctp_23 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.2, y = Dim.3, 
+                     colour = ctpints_both$nr_ints))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 2 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_continuous("Interactions/cell type pair", 
+                         limits = c(0, max_ctpints))+
+  ggtitle(paste(species, "interactome PCA"))
+  
+ints_ctp_12
+ints_ctp_13
+ints_ctp_23
+
+```
+
+### Nr of cells per emitter cell type
+
+```{r}
+
+nrc_ct_emi_12 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, colour = ctpints_both$nr_cells_emi))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 2 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_continuous("Nr of cells per emitter",
+                         limits = c(0, max_nrcells))+
+  ggtitle(paste(species, "interactome PCA"))
+
+nrc_ct_emi_13 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.3, colour = ctpints_both$nr_cells_emi))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_continuous("Nr of cells per emitter",
+                         limits = c(0, max_nrcells))+
+  ggtitle(paste(species, "interactome PCA"))
+  
+nrc_ct_emi_23 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.2, y = Dim.3, colour = ctpints_both$nr_cells_emi))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 2 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_continuous("Nr of cells per emitter",
+                         limits = c(0, max_nrcells))+
+  ggtitle(paste(species, "interactome PCA"))
+  
+nrc_ct_emi_12
+nrc_ct_emi_13
+nrc_ct_emi_23
+
+```
+
+### Nr of cells per ligand cell type
+
+```{r}
+
+nrc_ct_rec_12 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, colour = ctpints_both$nr_cells_rec))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 2 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_continuous("Nr of cells per receiver",
+                         limits = c(0, max_nrcells))+
+  ggtitle(paste(species, "interactome PCA"))
+
+nrc_ct_rec_13 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.3, colour = ctpints_both$nr_cells_rec))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_continuous("Nr of cells per receiver",
+                         limits = c(0, max_nrcells))+
+  ggtitle(paste(species, "interactome PCA"))
+  
+nrc_ct_rec_23 <- ggplot(cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),], 
+                 aes(x = Dim.2, y = Dim.3, colour = ctpints_both$nr_cells_rec))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("Component 3 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 3], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 2 [", round(cpi_merged$PCA[nrow(cpi_merged$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_continuous("Nr of cells per receiver",
+                         limits = c(0, max_nrcells))+
+  ggtitle(paste(species, "interactome PCA"))
+  
+nrc_ct_rec_12
+nrc_ct_rec_13
+nrc_ct_rec_23
+
+```
+
+## Distance
+
+```{r}
+
+# build a df to store the distance
+dist_df <- ctpints_yng[[1]][,c(1, 3, 4)]
+dist_df <- dist_df[order(dist_df$ct_pairs),]
+pca_df <- cpi_merged$PCA[1:(nrow(cpi_merged$PCA)-1),]
+
+dist_df$Distance_1 <- abs(
+  cpi_merged$PCA$Dim.1[which(cpi_merged$Celltypes$Age == "young")] -
+  cpi_merged$PCA$Dim.1[which(cpi_merged$Celltypes$Age == "old")])
+dist_df$Distance_2 <- abs(
+  cpi_merged$PCA$Dim.2[which(cpi_merged$Celltypes$Age == "young")] -
+  cpi_merged$PCA$Dim.2[which(cpi_merged$Celltypes$Age == "old")])
+dist_df$Distance_3 <- abs(
+  cpi_merged$PCA$Dim.3[which(cpi_merged$Celltypes$Age == "young")] -
+  cpi_merged$PCA$Dim.3[which(cpi_merged$Celltypes$Age == "old")])
+
+```
+
+```{r}
+
+ggplot(dist_df, 
+       aes(x = emitter, 
+           y = Distance_1,
+           fill = emitter))+
+  geom_boxplot()+
+  theme_classic()+
+  ylab("Abs(Coord(PC1 (yng)) - Coord(PC1 (old))")+
+  xlab("Emitter")+
+  scale_fill_manual("Emitter", values = col_emi_red)+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylim(limits = c(0,50))+
+  ggtitle(paste(species, "interactome PCA"))
+ 
+ggplot(dist_df, 
+       aes(x = receiver, 
+           y = Distance_1,
+           fill = receiver))+
+  geom_boxplot()+
+  theme_classic()+
+  ylab("Abs(Coord(PC1 (yng)) - Coord(PC1 (old))")+
+  xlab("Emitter")+
+  scale_fill_manual("Receiver", values = col_rec_red)+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylim(limits = c(0,50))+
+  ggtitle(paste(species, "interactome PCA"))
+         
+```
+
+```{r}
+
+ggplot(dist_df, 
+       aes(x = emitter, 
+           y = Distance_2,
+           fill = emitter))+
+  geom_boxplot()+
+  theme_classic()+
+  ylab("Abs(Coord(PC2 (yng)) - Coord(PC2 (old))")+
+  xlab("Emitter")+
+  scale_fill_manual("Emitter", values = col_emi_red)+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylim(limits = c(0,50))+
+  ggtitle(paste(species, "interactome PCA"))
+ 
+ggplot(dist_df, 
+       aes(x = receiver, 
+           y = Distance_2,
+           fill = receiver))+
+  geom_boxplot()+
+  theme_classic()+
+  ylab("Abs(Coord(PC2 (yng)) - Coord(PC2 (old))")+
+  xlab("Emitter")+
+  scale_fill_manual("Receiver", values = col_rec_red)+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylim(limits = c(0,50))+
+  ggtitle(paste(species, "interactome PCA"))
+         
+```
+
+```{r}
+
+ggplot(dist_df, 
+       aes(x = emitter, 
+           y = Distance_3,
+           fill = emitter))+
+  geom_boxplot()+
+  theme_classic()+
+  ylab("Abs(Coord(PC3 (yng)) - Coord(PC3 (old))")+
+  xlab("Emitter")+
+  scale_fill_manual("Emitter", values = col_emi_red)+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylim(limits = c(0,50))+
+  ggtitle(paste(species, "interactome PCA"))
+ 
+ggplot(dist_df, 
+       aes(x = receiver, 
+           y = Distance_3,
+           fill = receiver))+
+  geom_boxplot()+
+  theme_classic()+
+  ylab("Abs(Coord(PC3 (yng)) - Coord(PC3 (old))")+
+  xlab("Emitter")+
+  scale_fill_manual("Receiver", values = col_rec_red)+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylim(limits = c(0,50))+
+  ggtitle(paste(species, "interactome PCA"))
+         
+```

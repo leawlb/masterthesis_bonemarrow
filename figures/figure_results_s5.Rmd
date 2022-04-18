@@ -1,0 +1,138 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This requires loaded cpi_interactions_yng_vs_old.
+
+Sets and vriance related to Figure results 3.
+
+## A
+
+Score variance
+
+```{r}
+
+plot_a1 <- plot_both_emi_scores
+plot_a2 <- plot_both_rec_scores
+
+plot_a1
+plot_a2
+
+```
+
+## B
+
+```{r}
+
+plot_b1 <- ctints_yng_emi_plot
+plot_b2 <- ctints_old_emi_plot
+
+plot_b1
+plot_b2
+
+```
+
+# Assemble
+
+```{r}
+
+plot_A1 <- plot_a1 +
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # indidivual additions
+   theme(strip.text.y = element_blank(),
+        strip.text.x = element_text(size = 13, face = "bold"),
+        strip.background.x = element_blank(),
+        strip.background.y = element_blank()
+        )+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Score percentile variance")+
+  scale_color_manual("Emitters", values = col_emi_red)+
+  xlab("Emitters")
+  
+plot_A1
+
+```
+
+```{r}
+
+plot_A2 <- plot_a2 +
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # indidivual additions
+   theme(strip.text.y = element_blank(),
+        strip.text.x = element_text(size = 13, face = "bold"),
+        strip.background.x = element_blank(),
+        strip.background.y = element_blank()
+        )+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Score percentile variance")+
+  scale_color_manual("Receivers", values = col_rec_red)+
+  xlab("Receivers")
+  
+plot_A2
+
+```
+
+```{r}
+
+figure_s5_a <- ggarrange(
+  
+  plot_A1+theme(legend.position = "none"),
+  plot_A2+theme(legend.position = "none")
+)
+
+figure_s5_a
+
+ggsave("images/figure_s5_a.png",
+  figure_s5_a,
+  width = 17*0.787402,
+  height = 5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+```{r}
+
+plot_B1 <- plot_b1
+plot_B2 <- plot_b2
+
+ggsave("images/figure_s5_b1.png",
+  plot_B1,
+  width = 10*0.787402,
+  height = 7*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+ggsave("images/figure_s5_b2.png",
+  plot_B2,
+  width = 10*0.787402,
+  height = 7*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+
+```
+

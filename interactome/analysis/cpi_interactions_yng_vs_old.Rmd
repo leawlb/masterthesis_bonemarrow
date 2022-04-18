@@ -1,0 +1,2900 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This script analyses interactions at different levels for two cpi objects from 
+YOUNG and OLD datasets of THE SAME SPECIES.
+
+Replace the file path to load objects from different species.
+
+# Preparation
+
+## Libraries
+
+```{r libraries, message = FALSE}
+
+library(SingleCellExperiment)
+library(rlist)
+library(tidyverse)
+library(ComplexUpset)
+library(cowplot)
+library(ggpubr)
+library(ggbeeswarm)
+library(pheatmap)
+library(RColorBrewer)
+library(viridis)
+library(ggplotify)
+
+library(scran)
+library(ggpubr)
+#library(scater)
+#library(data.table)
+
+```
+
+## Load
+
+### Code
+
+```{r load_code, message = FALSE}
+
+setwd("/home/l012t/Interspecies_BM")
+
+source(file = "code/filepath.R")
+source(file = "code/colors.R")
+source(file = "interactome/functions/cpi_functions_analysis.R")
+
+```
+
+### Objects
+
+Adjust the file paths to load objects from different species. 
+After this, nothing needs to be changed.
+
+```{r}
+
+# merged and pre-processed SCE objects
+sce_yng <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_young_SCE_ds_ctrm"))
+sce_old <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_old_SCE_ds_ctrm"))
+
+# corresponding cpi objects
+cpi_yng <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng_cpi"))
+cpi_old <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old_cpi"))
+
+cpi_both <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_cpi_pca"))
+
+# corresponding metrics objects
+ctpints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctpints"))
+ctints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctints"))
+nrlrs_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nrlrs"))
+score_df_yng <-readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_ctpints_score_df"))
+
+ctpints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctpints"))
+ctints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctints"))
+nrlrs_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nrlrs"))
+score_df_old <-readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_ctpints_score_df"))
+
+name_yng <- "mmus_yng"
+name_old <- "mmus_old"
+species <- "mmus"
+
+max_ctpints <- 400
+max_ctints <- 600
+max_nrcells <- 10000
+max_nrlrs <- 220
+
+```
+
+Merge overview dfs for direct comparion between age groups.
+
+```{r}
+
+ctpints_both <- rbind(ctpints_yng[[1]], ctpints_old[[1]])
+ctpints_both$age <- factor(ctpints_both$age, levels = c("young", "old"))
+ctpints_both$emitter <- factor(ctpints_both$emitter, 
+                               levels = names(col_emi_red))
+ctpints_both$receiver <- factor(ctpints_both$receiver, 
+                               levels = names(col_rec_red))
+```
+
+```{r}
+
+ctints_both <- rbind(ctints_yng[[1]], ctints_old[[1]])
+ctints_both$age <- factor(ctints_both$age, levels = c("young", "old"))
+ctints_both$celltypes <- factor(ctints_both$celltypes, 
+                                levels = names(col_cts_red))
+```
+
+```{r}
+
+nrlrs_both <- rbind(nrlrs_yng, nrlrs_old)
+nrlrs_both$age <- factor(nrlrs_both$age, levels = c("young", "old"))
+nrlrs_both$celltypes <- factor(nrlrs_both$celltypes, 
+                               levels = names(col_cts_red))
+```
+
+```{r}
+
+score_df_yng$age <- "young"
+score_df_old$age <- "old"
+
+score_df_both <- rbind(score_df_yng, score_df_old)
+score_df_both$age <- factor(score_df_both$age, levels = c("young", "old"))
+score_df_both$emitter <- factor(score_df_both$emitter, 
+                               levels = names(col_emi_red))
+score_df_both$receiver <- factor(score_df_both$receiver, 
+                               levels = names(col_rec_red))
+
+```
+
+
+# Analysis
+
+## Ligand/Receptor cell type level (sigmols)
+
+Calculate the ctlrs object first.
+
+
+```{r}
+
+ctints_list <- list(ctints_yng, ctints_old)
+
+ctlrs_list <- lapply(ctints_list, function(ctints){
+  ctlrs <- lapply(ctints[[2]], extract_lrs_info)
+  return(ctlrs)
+})
+
+ctlrs_yng <- ctlrs_list[[1]]
+ctlrs_old <- ctlrs_list[[2]]
+
+```
+
+### Overlap between age groups
+
+```{r}
+
+sigmols_age_list <- list()
+sigmols_age_vec <- vector()
+for(i in names(ctlrs_yng)){
+
+  shared_sigmols <- intersect(ctlrs_old[[i]]$sigmols, ctlrs_yng[[i]]$sigmols)
+
+  unique_yng_sigmols <- ctlrs_yng[[i]]$sigmols[-which(ctlrs_yng[[i]]$sigmols %in% shared_sigmols)]
+  unique_old_sigmols <- ctlrs_old[[i]]$sigmols[-which(ctlrs_old[[i]]$sigmols %in% shared_sigmols)]
+  
+  
+  return_list <- list(
+    shared_sigmols = shared_sigmols,
+    unique_yng_sigmols = unique_yng_sigmols,
+    unique_old_sigmols = unique_old_sigmols
+  
+  )
+  
+  sigmols_age_list[[i]] <- return_list
+  sigmols_age_vec[i] <- length(shared_sigmols)
+  
+}
+
+names(sigmols_age_list) <- names(ctlrs_yng)
+names(sigmols_age_vec) <- names(ctlrs_yng)
+
+```
+
+```{r}
+
+sigmols_shared_age <- data.frame(
+  celltypes = names(col_cts_red),
+  annotation = c(rep("emitter", 11), rep("receiver", 11))
+)
+
+sigmols_shared_age$shared <- vector(length = nrow(sigmols_shared_age))
+sigmols_shared_age$old <- vector(length = nrow(sigmols_shared_age))
+sigmols_shared_age$young <- vector(length = nrow(sigmols_shared_age))
+
+
+for(i in unique(sigmols_shared_age$celltype)){
+  
+  siglist <- sigmols_age_list[[i]]
+  
+  sigmols_shared_age$shared[
+    sigmols_shared_age$celltypes == i] <- length(siglist$shared_sigmols)
+  sigmols_shared_age$old[
+    sigmols_shared_age$celltypes == i] <- length(siglist$unique_old_sigmols)
+  sigmols_shared_age$young[
+    sigmols_shared_age$celltypes == i] <- length(siglist$unique_yng_sigmols)
+
+}
+
+sigmols_shared_age$old_total <- sigmols_shared_age$old + sigmols_shared_age$shared
+sigmols_shared_age$yng_total <- sigmols_shared_age$young + sigmols_shared_age$shared
+sigmols_shared_age$order <- sigmols_shared_age$shared
+
+sigmols_shared_young <- pivot_longer(sigmols_shared_age,
+                                     cols = c(3,5), names_to = "sample")
+
+sigmols_shared_old <- pivot_longer(sigmols_shared_age,
+                                     cols = c(3,4), names_to = "sample")
+
+sigmols_shared_young$sample[sigmols_shared_young$sample == "young"] <- "exclusively young"
+sigmols_shared_old$sample[sigmols_shared_old$sample == "old"] <- "exclusively old"
+
+sigmols_shared_young$sample <- factor(sigmols_shared_young$sample,
+                                      levels = c("exclusively young", "exclusively old", "shared"))
+sigmols_shared_old$sample <- factor(sigmols_shared_old$sample,
+                                      levels = c("exclusively young", "exclusively old", "shared"))
+
+```
+
+```{r}
+
+legend_plot <- ggplot(sigmols_shared_young, 
+         aes(y = reorder(celltypes, order), x = value, fill = sample))+
+    geom_col(position = "stack")+
+    scale_fill_manual("", values = c("old" = col_age[[2]], 
+                                     "young" = col_age[[1]], 
+                                    shared = "orange"))
+
+legend_ctp_age <- get_legend(legend_plot)
+
+plot_lrs_age_emi <- ggarrange(
+  
+  ncol = 3,
+  widths = c(1, 1.35, 0.4),
+
+  ggplot(sigmols_shared_young[sigmols_shared_young$annotation == "emitter",], 
+         aes(y = reorder(celltypes, order), x = -value, fill = sample))+
+    geom_col(position = "stack")+
+    scale_fill_manual("", values = c("old" = col_age[[2]], 
+                                     "young" = col_age[[1]], 
+                                    shared = "orange"))+
+    theme_classic()+
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(-max_nrlrs, 0),
+                       breaks = c(-max_nrlrs, (-max_nrlrs* 0.5), 0),
+                       labels = c(max_nrlrs, (max_nrlrs* 0.5), 0))+
+    ylab("")+
+    xlab("Number of ligands/cell type")+
+    ggtitle(paste(species, "young"))+
+    theme(legend.position = "none"),
+ 
+  
+   ggplot(sigmols_shared_old[sigmols_shared_old$annotation == "emitter",], 
+         aes(y = reorder(celltypes, order), x = value, fill = sample))+
+    geom_col(position = "stack")+
+    scale_fill_manual("", values = c("old" = col_age[[2]], 
+                                     "young" = col_age[[1]], 
+                                    shared = "orange"))+
+    theme_classic()+
+    theme(axis.text.y = element_text(size = 9, hjust = 0.5),
+          axis.title.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(0, max_nrlrs),
+                       breaks = c(0, (max_nrlrs*0.5), max_nrlrs),
+                       labels = c(0, (max_nrlrs*0.5), max_nrlrs))+
+    ylab("Cell type pairs")+
+    xlab("Number of ligands/cell type")+
+    ggtitle(paste(species, "old"))+
+    theme(legend.position = "none"),
+  legend_ctp_age
+
+    
+)
+
+plot_lrs_age_rec <- ggarrange(
+  
+  ncol = 3,
+  widths = c(1, 1.5, 0.4),
+
+  ggplot(sigmols_shared_young[sigmols_shared_young$annotation == "receiver",], 
+         aes(y = reorder(celltypes, order), x = -value, fill = sample))+
+    geom_col(position = "stack")+
+    scale_fill_manual("", values = c("old" = col_age[[2]], 
+                                     "young" = col_age[[1]], 
+                                    shared = "orange"))+
+    theme_classic()+
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(-max_nrlrs, 0),
+                       breaks = c(-max_nrlrs, (-max_nrlrs* 0.5), 0),
+                       labels = c(max_nrlrs, (max_nrlrs* 0.5), 0))+
+    ylab("")+
+    xlab("Number of receptors/cell type")+
+    ggtitle(paste(species, "young"))+
+    theme(legend.position = "none"),
+ 
+  
+   ggplot(sigmols_shared_old[sigmols_shared_old$annotation == "receiver",], 
+         aes(y = reorder(celltypes, order), x = value, fill = sample))+
+    geom_col(position = "stack")+
+    scale_fill_manual("", values = c("old" = col_age[[2]], 
+                                     "young" = col_age[[1]], 
+                                    shared = "orange"))+
+    theme_classic()+
+    theme(axis.text.y = element_text(size = 9, hjust = 0.5),
+          axis.title.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(0, max_nrlrs),
+                       breaks = c(0, (max_nrlrs*0.5), max_nrlrs),
+                       labels = c(0, (max_nrlrs*0.5), max_nrlrs))+
+    ylab("Cell type pairs")+
+    xlab("Number of receptors/cell type")+
+    ggtitle(paste(species, "old"))+
+    theme(legend.position = "none"),
+  legend_ctp_age
+
+    
+)
+
+plot_lrs_age_emi
+plot_lrs_age_rec
+
+```
+
+```{r}
+
+sigmols_shared_age$perc_unique_old <- sigmols_shared_age$old/sigmols_shared_age$old_total*100
+sigmols_shared_age$perc_unique_yng <- sigmols_shared_age$young/sigmols_shared_age$yng_total*100
+
+sigmols_shared_age_long <- sigmols_shared_age %>%
+  pivot_longer(cols = c(9, 10), names_to = "age", values_to = "unique_percent")
+
+sigmols_shared_age_long$annotation[sigmols_shared_age_long$annotation == "emitter"] <- "Emitters"
+sigmols_shared_age_long$annotation[sigmols_shared_age_long$annotation == "receiver"] <- "Receivers"
+ 
+sigmols_shared_age_long$age <- gsub("perc_unique_", "", sigmols_shared_age_long$age)
+sigmols_shared_age_long$age[sigmols_shared_age_long$age == "yng"] <- "young"
+sigmols_shared_age_long$age <- factor(sigmols_shared_age_long$age, levels = c("young", "old"))
+
+plot_emirec_unique <- ggplot(sigmols_shared_age_long, 
+                             aes(x = annotation, y = unique_percent, 
+                                 color = age))+
+  geom_boxplot()
+
+plot_emirec_unique
+
+```
+
+
+Get the genes exclusively detected in old or young.
+
+```{r}
+
+shared_sigmols_all <- vector()
+yng_sigmols_all <- vector()
+old_sigmols_all <- vector()
+
+for(i in 1:length(sigmols_age_list)){
+  
+  shared_sigmols_all <- c(shared_sigmols_all, sigmols_age_list[[i]][[1]])
+  yng_sigmols_all <- c(yng_sigmols_all, sigmols_age_list[[i]][[2]])
+  old_sigmols_all <- c(old_sigmols_all, sigmols_age_list[[i]][[3]])
+}
+
+# remove all duplicates
+shared_sigmols_all <- unique(shared_sigmols_all)
+yng_sigmols_all <- unique(yng_sigmols_all)
+old_sigmols_all <- unique(old_sigmols_all)
+
+# it is possible that one ligand exclusively expressedin CT1 old is expressed in CT2 young
+table(is.na(match(shared_sigmols_all, yng_sigmols_all)))
+table(is.na(match(shared_sigmols_all, old_sigmols_all)))
+table(is.na(match(yng_sigmols_all, old_sigmols_all)))
+# there is significant overlap
+
+yng_sigmols_all <- yng_sigmols_all[is.na(match(yng_sigmols_all, old_sigmols_all))]
+yng_sigmols_all <- yng_sigmols_all[is.na(match(yng_sigmols_all, shared_sigmols_all))]
+
+old_sigmols_all <- old_sigmols_all[is.na(match(old_sigmols_all, yng_sigmols_all))]
+old_sigmols_all <- old_sigmols_all[is.na(match(old_sigmols_all, shared_sigmols_all))]
+
+old_genes <- old_sigmols_all
+yng_genes <- yng_sigmols_all
+
+old_genes
+yng_genes
+
+```
+
+With these genes I want to perform GO term enrichment analysis.
+
+```{r}
+
+old_genes <- factor(old_genes, levels = old_genes)
+levels(old_genes)
+
+all_genes <- unique(c(cpi_both$Interactions$ligand_symbol, cpi_both$Interactions$receptor_symbol))
+all_genes <- factor(all_genes, levels = all_genes)
+
+all_genes_df <- data.frame(
+  genes = all_genes,
+  filler = rep("1", length(all_genes))
+)
+
+write_csv(all_genes_df, file = "../../data/all_genes_df.csv")
+
+old_genes_df <- data.frame(
+  genes = old_genes,
+  filler = rep("1", length(old_genes))
+)
+
+write_csv(old_genes_df, file = "../../data/old_genes_df.csv")
+
+
+```
+
+
+### Ligand/Receptor overlap between cell types
+
+percentage of overlap
+
+```{r}
+
+ctlrs_binary_yng <- data.frame(
+  row.names = unique(c(cpi_yng$Interactions$ligand_symbol,
+                     cpi_yng$Interactions$receptor_symbol)))
+
+for(i in 1:length(names(ctlrs_yng))){
+  ctlrs_binary_yng[,i] <- vector(length = nrow(ctlrs_binary_yng))
+
+}
+
+colnames(ctlrs_binary_yng) <- names(ctlrs_yng)
+
+for(j in 1:length(names(ctlrs_yng))){
+  for(i in 1:nrow(ctlrs_binary_yng)){
+    if(rownames(ctlrs_binary_yng)[i] %in% ctlrs_yng[[j]]$sigmols){
+      ctlrs_binary_yng[i,j] <- 1
+    }else{
+      ctlrs_binary_yng[i,j] <- 0
+    }
+  }
+}
+
+ctlrs_binary_yng_emi <- ctlrs_binary_yng[,1:11]
+ctlrs_binary_yng_rec <- ctlrs_binary_yng[,12:22]
+
+ctlrs_binary_yng_emi <- ctlrs_binary_yng_emi[rowMeans(ctlrs_binary_yng_emi[,1:11]) > 0,]
+ctlrs_binary_yng_rec <- ctlrs_binary_yng_rec[rowMeans(ctlrs_binary_yng_rec[,1:11]) > 0,]
+ctlrs_binary_yng <- ctlrs_binary_yng[rowMeans(ctlrs_binary_yng[,1:22]) > 0,]
+
+
+ctlrs_binary_old <- data.frame(
+  row.names = unique(c(cpi_old$Interactions$ligand_symbol,
+                     cpi_old$Interactions$receptor_symbol)))
+
+for(i in 1:length(names(ctlrs_old))){
+  ctlrs_binary_old[,i] <- vector(length = nrow(ctlrs_binary_old))
+
+}
+
+colnames(ctlrs_binary_old) <- names(ctlrs_old)
+
+for(j in 1:length(names(ctlrs_old))){
+  for(i in 1:nrow(ctlrs_binary_old)){
+    if(rownames(ctlrs_binary_old)[i] %in% ctlrs_old[[j]]$sigmols){
+      ctlrs_binary_old[i,j] <- 1
+    }else{
+      ctlrs_binary_old[i,j] <- 0
+    }
+  }
+}
+
+ctlrs_binary_old_emi <- ctlrs_binary_old[,1:11]
+ctlrs_binary_old_rec <- ctlrs_binary_old[,12:22]
+
+ctlrs_binary_old_emi <- ctlrs_binary_old_emi[rowMeans(ctlrs_binary_old_emi[,1:11]) > 0,]
+ctlrs_binary_old_rec <- ctlrs_binary_old_rec[rowMeans(ctlrs_binary_old_rec[,1:11]) > 0,]
+ctlrs_binary_old <- ctlrs_binary_old[rowMeans(ctlrs_binary_old[,1:22]) > 0,]
+
+```
+
+
+```{r fig.width = 6}
+
+ctlrs_binary_yng$shared <- vector(length = nrow(ctlrs_binary_yng))
+ctlrs_binary_yng_emi$shared_emi <- vector(length = nrow(ctlrs_binary_yng_emi))
+ctlrs_binary_yng_rec$shared_rec <- vector(length = nrow(ctlrs_binary_yng_rec))
+
+
+ctlrs_binary_yng$shared[rowMeans(ctlrs_binary_yng[1:22]) == 1] <- TRUE
+ctlrs_binary_yng_emi$shared_emi[rowMeans(ctlrs_binary_yng_emi[1:11]) == 1] <- TRUE
+ctlrs_binary_yng_rec$shared_rec[rowMeans(ctlrs_binary_yng_rec[1:11]) == 1] <- TRUE
+
+
+ctlrs_yng_emi_plot <- upset(ctlrs_binary_yng_emi,
+      intersect = colnames(ctlrs_binary_yng_emi[,1:11]),
+     sort_intersections_by = c("cardinality", "ratio"),
+      min_size = 5,
+      name = NULL,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared_emi),
+            width=0.8),
+            position='right')+
+          # base theme
+          theme_classic()+
+          theme(axis.text = element_text(size = 8),
+            axis.title = element_text(size = 9),
+            legend.title = element_text(size = 9, face = "bold"),
+            legend.text = element_text(size = 8),
+            plot.title = element_text(size = 10, face = "bold"))+
+          # individual
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[1]]))+
+          ylab("Interactions/cell type")+
+          theme(axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                plot.background = element_blank())+
+        ylim(limits = c(0, max_nrlrs))),
+      guides='over',
+      matrix=(
+         intersection_matrix(
+            geom=geom_point())+
+           scale_y_discrete(labels = NULL)+
+           theme(legend.position = "none")),
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE)+
+            # base theme
+            theme_classic()+
+            theme(axis.text = element_text(size = 8),
+            axis.title = element_text(size = 9),
+            legend.title = element_text(size = 9, face = "bold"),
+            legend.text = element_text(size = 8),
+            plot.title = element_text(size = 10, face = "bold"))+
+            scale_fill_manual("LRI annotation", values = col_itp)+
+            theme(axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank())+
+            ylab("Number of shared interactions")+
+              ylim(limits = c(0, 55))+
+              ggtitle(paste(species, "young", "emitters", sep = " "))
+        )
+    )
+)
+
+
+ctlrs_yng_rec_plot <-upset(ctlrs_binary_yng_rec,
+      intersect = colnames(ctlrs_binary_yng_rec[,1:11]),
+     sort_intersections_by = c("cardinality", "ratio"),
+      min_size = 5,
+      name = NULL,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared_rec),
+            width=0.8),
+            position='right')+
+          # base theme
+          theme_classic()+
+          theme(axis.text = element_text(size = 8),
+            axis.title = element_text(size = 9),
+            legend.title = element_text(size = 9, face = "bold"),
+            legend.text = element_text(size = 8),
+            plot.title = element_text(size = 10, face = "bold"))+
+          # individual
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[1]]))+
+          ylab("Interactions/cell type")+
+          theme(axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                plot.background = element_blank())+
+        ylim(limits = c(0, max_nrlrs))),
+      guides='over',
+      matrix=(
+         intersection_matrix(
+            geom=geom_point())+
+           scale_y_discrete(labels = NULL)+
+           theme(legend.position = "none")),
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE)+
+            # base theme
+            theme_classic()+
+            theme(axis.text = element_text(size = 8),
+            axis.title = element_text(size = 9),
+            legend.title = element_text(size = 9, face = "bold"),
+            legend.text = element_text(size = 8),
+            plot.title = element_text(size = 10, face = "bold"))+
+            scale_fill_manual("LRI annotation", values = col_itp)+
+            theme(axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank())+
+            ylab("Number of shared interactions")+
+              ylim(limits = c(0, 55))+
+              ggtitle(paste(species, "young", "receivers", sep = " "))
+        )
+    )
+)
+
+
+ctlrs_yng_plot <-upset(ctlrs_binary_yng,
+      intersect = colnames(ctlrs_binary_yng[,1:22]),
+     sort_intersections_by = c("cardinality", "ratio"),
+     height_ratio = 0.8,
+      min_size = 5,
+      name = NULL,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared),
+            width=0.8),
+            position='right')+
+          # base theme
+          theme_classic()+
+          theme(axis.text = element_text(size = 8),
+            axis.title = element_text(size = 9),
+            legend.title = element_text(size = 9, face = "bold"),
+            legend.text = element_text(size = 8),
+            plot.title = element_text(size = 10, face = "bold"))+
+          # individual
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[1]]))+
+          ylab("Interactions/cell type")+
+          theme(axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                plot.background = element_blank())+
+        ylim(limits = c(0, max_nrlrs))),
+      guides='over',
+      matrix=(
+         intersection_matrix(
+            geom=geom_point())+
+           scale_y_discrete(labels = NULL)+
+           theme(legend.position = "none")),
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE)+
+            # base theme
+            theme_classic()+
+            theme(axis.text = element_text(size = 8),
+            axis.title = element_text(size = 9),
+            legend.title = element_text(size = 9, face = "bold"),
+            legend.text = element_text(size = 8),
+            plot.title = element_text(size = 10, face = "bold"))+
+            scale_fill_manual("LRI annotation", values = col_itp)+
+            theme(axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank())+
+            ylab("Number of shared interactions")+
+              ylim(limits = c(0, 55))+
+              ggtitle(paste(species, "young", "all cell types", sep = " "))
+        )
+    )
+)
+
+ctlrs_yng_emi_plot
+ctlrs_yng_rec_plot
+ctlrs_yng_plot
+
+```
+
+```{r fig.width = 6}
+
+ctlrs_binary_old$shared <- vector(length = nrow(ctlrs_binary_old))
+ctlrs_binary_old_emi$shared_emi <- vector(length = nrow(ctlrs_binary_old_emi))
+ctlrs_binary_old_rec$shared_rec <- vector(length = nrow(ctlrs_binary_old_rec))
+
+
+ctlrs_binary_old$shared[rowMeans(ctlrs_binary_old[1:22]) == 1] <- TRUE
+ctlrs_binary_old_emi$shared_emi[rowMeans(ctlrs_binary_old_emi[1:11]) == 1] <- TRUE
+ctlrs_binary_old_rec$shared_rec[rowMeans(ctlrs_binary_old_rec[1:11]) == 1] <- TRUE
+
+
+ctlrs_old_emi_plot <- ctlrs_binary_emi_plot <-upset(ctlrs_binary_old_emi,
+      intersect = colnames(ctlrs_binary_old_emi[,1:11]),
+     sort_intersections_by = c("cardinality", "ratio"),
+      min_size = 5,
+      name = NULL,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared_emi),
+            width=0.8),
+            position='right')+
+          # base theme
+          theme_classic()+
+          theme(axis.text = element_text(size = 8),
+            axis.title = element_text(size = 9),
+            legend.title = element_text(size = 9, face = "bold"),
+            legend.text = element_text(size = 8),
+            plot.title = element_text(size = 10, face = "bold"))+
+          # individual
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[1]]))+
+          ylab("Interactions/cell type")+
+          theme(axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                plot.background = element_blank())+
+        ylim(limits = c(0, max_nrlrs))),
+      guides='over',
+      matrix=(
+         intersection_matrix(
+            geom=geom_point())+
+           scale_y_discrete(labels = NULL)+
+           theme(legend.position = "none")),
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE)+
+            # base theme
+            theme_classic()+
+            theme(axis.text = element_text(size = 8),
+            axis.title = element_text(size = 9),
+            legend.title = element_text(size = 9, face = "bold"),
+            legend.text = element_text(size = 8),
+            plot.title = element_text(size = 10, face = "bold"))+
+            scale_fill_manual("LRI annotation", values = col_itp)+
+            theme(axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank())+
+            ylab("Number of shared interactions")+
+              ylim(limits = c(0, 80))+
+              ggtitle(paste(species, "old", "emitters", sep = " "))
+        )
+    )
+)
+
+
+ctlrs_old_rec_plot <- upset(ctlrs_binary_old_rec,
+      intersect = colnames(ctlrs_binary_old_rec[,1:11]),
+     sort_intersections_by = c("cardinality", "ratio"),
+      min_size = 5,
+      name = NULL,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared_rec),
+            width=0.8),
+            position='right')+
+          # base theme
+          theme_classic()+
+          theme(axis.text = element_text(size = 8),
+            axis.title = element_text(size = 9),
+            legend.title = element_text(size = 9, face = "bold"),
+            legend.text = element_text(size = 8),
+            plot.title = element_text(size = 10, face = "bold"))+
+          # individual
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[1]]))+
+          ylab("Interactions/cell type")+
+          theme(axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                plot.background = element_blank())+
+        ylim(limits = c(0, max_nrlrs))),
+      guides='over',
+      matrix=(
+         intersection_matrix(
+            geom=geom_point())+
+           scale_y_discrete(labels = NULL)+
+           theme(legend.position = "none")),
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE)+
+            # base theme
+            theme_classic()+
+            theme(axis.text = element_text(size = 8),
+            axis.title = element_text(size = 9),
+            legend.title = element_text(size = 9, face = "bold"),
+            legend.text = element_text(size = 8),
+            plot.title = element_text(size = 10, face = "bold"))+
+            scale_fill_manual("LRI annotation", values = col_itp)+
+            theme(axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank())+
+            ylab("Number of shared interactions")+
+              ylim(limits = c(0, 80))+
+              ggtitle(paste(species, "old", "receivers", sep = " "))
+        )
+    )
+)
+
+
+ctlrs_old_plot <- upset(ctlrs_binary_old,
+      intersect = colnames(ctlrs_binary_old[,1:22]),
+     sort_intersections_by = c("cardinality", "ratio"),
+     height_ratio = 0.8,
+      min_size = 5,
+      name = NULL,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared),
+            width=0.8),
+            position='right')+
+          # base theme
+          theme_classic()+
+          theme(axis.text = element_text(size = 8),
+            axis.title = element_text(size = 9),
+            legend.title = element_text(size = 9, face = "bold"),
+            legend.text = element_text(size = 8),
+            plot.title = element_text(size = 10, face = "bold"))+
+          # individual
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[1]]))+
+          ylab("Interactions/cell type")+
+          theme(axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                plot.background = element_blank())+
+        ylim(limits = c(0, max_nrlrs))),
+      guides='over',
+      matrix=(
+         intersection_matrix(
+            geom=geom_point())+
+           scale_y_discrete(labels = NULL)+
+           theme(legend.position = "none")),
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE)+
+            # base theme
+            theme_classic()+
+            theme(axis.text = element_text(size = 8),
+            axis.title = element_text(size = 9),
+            legend.title = element_text(size = 9, face = "bold"),
+            legend.text = element_text(size = 8),
+            plot.title = element_text(size = 10, face = "bold"))+
+            scale_fill_manual("LRI annotation", values = col_itp)+
+            theme(axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank())+
+            ylab("Number of shared interactions")+
+              ylim(limits = c(0, 80))+
+              ggtitle(paste(species, "old", "all cell types", sep = " "))
+        )
+    )
+)
+
+ctlrs_old_emi_plot 
+ctlrs_old_rec_plot 
+ctlrs_old_plot 
+  
+```
+
+### Percentage of shared interactions
+
+```{r}
+
+# ligands
+perc_lig_yng <- data.frame(
+  row.names = colnames(ctlrs_binary_yng_emi)[1:11],
+  percent = vector(length = 11),
+  age = rep("young", 11),
+  annotation = rep("Ligands", 11)
+)
+
+for(i in 1:nrow(perc_lig_yng)){
+  
+  shared <- length(which(ctlrs_binary_yng_emi$shared_emi == TRUE))
+  perc_lig_yng$percent[i] <- shared/length(which(ctlrs_binary_yng_emi[i] == 1))*100
+}
+perc_lig_yng
+
+perc_lig_old <- data.frame(
+  row.names = colnames(ctlrs_binary_old_emi)[1:11],
+  percent = vector(length = 11),
+  age = rep("old", 11),
+  annotation = rep("Ligands", 11)
+)
+
+for(i in 1:nrow(perc_lig_old)){
+  
+  shared <- length(which(ctlrs_binary_old_emi$shared_emi == TRUE))
+  perc_lig_old$percent[i] <- shared/length(which(ctlrs_binary_old_emi[i] == 1))*100
+}
+perc_lig_old
+
+
+# receptors
+perc_rec_yng <- data.frame(
+  row.names = colnames(ctlrs_binary_yng_rec)[1:11],
+  percent = vector(length = 11),
+  age = rep("young", 11),
+  annotation = rep("Receptors", 11)
+)
+
+for(i in 1:nrow(perc_rec_yng)){
+  
+  shared <- length(which(ctlrs_binary_yng_rec$shared_rec == TRUE))
+  perc_rec_yng$percent[i] <- shared/length(which(ctlrs_binary_yng_rec[i] == 1))*100
+}
+perc_rec_yng
+
+perc_rec_old <- data.frame(
+  row.names = colnames(ctlrs_binary_old_rec)[1:11],
+  percent = vector(length = 11),
+  age = rep("old", 11),
+  annotation = rep("Receptors", 11)
+)
+
+for(i in 1:nrow(perc_rec_old)){
+  
+  shared <- length(which(ctlrs_binary_old_rec$shared_rec == TRUE))
+  perc_rec_old$percent[i] <- shared/length(which(ctlrs_binary_old_rec[i] == 1))*100
+}
+
+perc_rec_old
+
+perc_all_lig <- rbind(perc_lig_yng, perc_lig_old)
+perc_all_rec <- rbind(perc_rec_yng, perc_rec_old)
+
+perc_all_lig$age <- factor(perc_all_lig$age, levels = c("young", "old"))
+perc_all_rec$age <- factor(perc_all_rec$age, levels = c("young", "old"))
+
+perc_all_lig$percent_unique <- 100 -perc_all_lig$percent
+perc_all_rec$percent_unique <- 100 -perc_all_rec$percent
+
+```
+
+```{r}
+
+ggplot(perc_all_lig, aes(x = age, y = percent, color = age))+
+  geom_boxplot()+
+  ylim(limits = c(0,100))+
+  theme_classic()+
+  scale_color_manual("Age", values = col_age)+
+  ylab("Shared ligands per emitter [%]")
+
+ggplot(perc_all_rec, aes(x = age, y = percent, color = age))+
+  geom_boxplot()+
+  ylim(limits = c(0,100))+
+  theme_classic()+
+  scale_color_manual("Age", values = col_age)+
+  ylab("Shared receptors per receiver [%]")
+
+median(perc_all_lig$percent[perc_all_lig$age == "old"])
+median(perc_all_lig$percent[perc_all_lig$age == "young"])
+
+median(perc_all_rec$percent[perc_all_rec$age == "old"])
+median(perc_all_rec$percent[perc_all_rec$age == "young"])
+
+
+```
+
+
+### Directly compare ranks
+
+```{r}
+
+# make on df with ints for young
+ctints_yng_all <- data.frame(
+  interactions = vector(),
+  celltype = vector(),
+  annotation = vector(),
+  rank = vector()
+)
+
+for(i in 1:length(ctints_yng[[2]])){
+  
+  ctints_yng_all <- rbind(ctints_yng_all, ctints_yng[[2]][[i]])
+}
+
+# one for old
+ctints_old_all <- data.frame(
+  interactions = vector(),
+  celltype = vector(),
+  annotation = vector(),
+  rank = vector()
+)
+
+for(i in 1:length(ctints_yng[[2]])){
+  
+  ctints_old_all <- rbind(ctints_old_all, ctints_old[[2]][[i]])
+}
+
+# add info on age and separate interactions into ligand, receptors
+ctints_yng_all$age <- "young"
+ctints_yng_all$celltype <- paste0(ctints_yng_all$celltype, "_yng")
+
+ctints_yng_all$ligand <- gsub("[&][[:print:]]+", "", ctints_yng_all$interactions)
+ctints_yng_all$receptor <- gsub("[[:print:]]+[&]", "", ctints_yng_all$interactions)
+
+ctints_old_all$age <- "old"
+ctints_old_all$celltype <- paste0(ctints_old_all$celltype, "_old")
+
+ctints_old_all$ligand <- gsub("[&][[:print:]]+", "", ctints_old_all$interactions)
+ctints_old_all$receptor <- gsub("[[:print:]]+[&]", "", ctints_old_all$interactions)
+
+# rbind into one df
+ctints_all <- rbind(ctints_yng_all, ctints_old_all)
+
+# make a dataframe that fits heatmap
+ctints_all_test <- ctints_all %>%
+  pivot_wider(names_from = celltype, values_from = rank)
+
+# make one dataframe for ligand ranks
+ctints_all_test_lig <- data.frame(
+  row.names = unique(ctints_all$ligand)
+)
+ctints_all_test_lig[,1:44] <- vector(length = nrow(ctints_all_test_lig))
+colnames(ctints_all_test_lig) <- colnames(ctints_all_test[,6:49])
+
+for(i in 1:ncol(ctints_all_test_lig)){
+  for(j in 1:nrow(ctints_all_test_lig)){
+    
+    celltype <- colnames(ctints_all_test_lig)[i]
+    ligand <- rownames(ctints_all_test_lig)[j]
+    
+    ctints_all_test_lig[j,i] <- as.numeric(
+      ctints_all_test[
+        # only the row of the ligand in question
+        grep(ligand, ctints_all_test$ligand)[
+          # since each interaction is not detected in all ages, choose the first that is not NA
+          which(!is.na(ctints_all_test[
+            grep(ligand, ctints_all_test$ligand), 
+            grep(celltype, colnames(ctints_all_test))]))[1]],
+        # only the col of the cell type in question
+      grep(celltype, colnames(ctints_all_test))])
+  }
+}
+
+# make one for receptor ranks
+
+ctints_all_test_rec <- data.frame(
+  row.names = unique(ctints_all$receptor)
+)
+ctints_all_test_rec[,1:44] <- vector(length = nrow(ctints_all_test_rec))
+colnames(ctints_all_test_rec) <- colnames(ctints_all_test[,6:49])
+
+for(i in 1:ncol(ctints_all_test_rec)){
+  for(j in 1:nrow(ctints_all_test_rec)){
+    
+    celltype <- colnames(ctints_all_test_rec)[i]
+    receptor <- rownames(ctints_all_test_rec)[j]
+    
+    ctints_all_test_rec[j,i] <- as.numeric(
+      ctints_all_test[
+        # only the row of the receptor in question
+        grep(receptor, ctints_all_test$receptor)[
+          # since each interaction is not detected in all ages, choose the first that is not NA
+          which(!is.na(ctints_all_test[
+            grep(receptor, ctints_all_test$receptor), 
+            grep(celltype, colnames(ctints_all_test))]))[1]],
+        # only the col of the cell type in question
+      grep(celltype, colnames(ctints_all_test))])
+  }
+}
+
+```
+
+My color scheme for ranks
+
+```{r}
+
+min_rank <- min(ctints_all$rank[ctints_all$rank != 0])
+
+zero_to_min_r = rep(viridis(n = 1, option = "D", begin = 0.3, end = 0.3),
+                    min_rank*100)
+min_to_1_r = viridis(n = c((min_rank*100:100)), option = "D", begin = 0.3,
+                     end = 1)
+
+
+cols_r = c(zero_to_min_r, min_to_1_r)
+
+mypalette <- colorRampPalette(cols_r)(255)
+
+```
+
+#### Ligands
+
+```{r}
+
+ctints_all_test_lig[is.na(ctints_all_test_lig)] <- 0
+
+ctints_all_test_emi <- ctints_all_test_lig[,c(1:11, 23:33)]
+ctints_all_test_emi <- ctints_all_test_emi[which(rowMeans(ctints_all_test_emi) >0),]
+
+match_pos_emi <- match(names(col_emi_red), 
+                       gsub("_yng", "", colnames(ctints_all_test_emi)))
+
+match_pos_emi <- c(match_pos_emi, match_pos_emi+11)
+
+ctints_all_test_emi <- ctints_all_test_emi[,match_pos_emi]
+
+anno_col_emi <- data.frame(
+  row.names = colnames(ctints_all_test_emi),
+  Age = c(rep("young", 11), rep("old", 11)),
+  Celltypes = c(names(col_emi_red)[], names(col_emi_red))
+)
+
+color_list_emi <- list(
+  "Age" = col_age,
+  "Celltypes" = col_emi_red
+)
+
+plot_ligands <- as.ggplot(pheatmap(ctints_all_test_emi,
+         cluster_cols = FALSE, 
+         color = mypalette,
+         show_rownames = FALSE,
+         show_colnames = FALSE,
+         annotation_col = anno_col_emi,
+         annotation_colors = color_list_emi,
+         fontsize = 12))
+
+```
+
+#### Receptors
+
+```{r}
+
+ctints_all_test_rec[is.na(ctints_all_test_rec)] <- 0
+
+ctints_all_test_rece <- ctints_all_test_lig[,c(12:22, 34:44)]
+ctints_all_test_rece <- ctints_all_test_rece[which(rowMeans(ctints_all_test_rece) >0),]
+
+match_pos_rec <- match(names(col_rec_red), 
+                       gsub("_yng", "", colnames(ctints_all_test_rece)))
+
+match_pos_rec <- c(match_pos_rec, match_pos_rec+11)
+
+ctints_all_test_rece <- ctints_all_test_rece[,match_pos_rec]
+
+anno_col_rec <- data.frame(
+  row.names = colnames(ctints_all_test_rece),
+  Age = c(rep("young", 11), rep("old", 11)),
+  Celltypes = c(names(col_rec_red))
+)
+
+color_list_rec <- list(
+  "Age" = col_age,
+  "Celltypes" = col_rec_red
+)
+
+plot_receptors <- as.ggplot(pheatmap(ctints_all_test_rece,
+         cluster_cols = FALSE, 
+         color = mypalette,
+         show_rownames = FALSE,
+         show_colnames = FALSE,
+         annotation_col = anno_col_rec,
+         annotation_colors = color_list_rec,
+         fontsize = 12))
+
+```
+
+Ligand variability within age group
+
+```{r}
+
+
+ctints_all_test_emi_Test <- ctints_all_test_emi
+ctints_all_test_emi_Test <- rownames_to_column(ctints_all_test_emi_Test, "ligands")
+
+ctints_all_test_emi_Test <- ctints_all_test_emi_Test %>%
+  pivot_longer(cols = c(2:ncol(ctints_all_test_emi_Test)), values_to = "ranks",
+               names_to = "celltypes")
+
+ctints_all_test_emi_Test$age <- gsub("[[:print:]]+[_]", "", ctints_all_test_emi_Test$celltypes)
+ctints_all_test_emi_Test$age[ctints_all_test_emi_Test$age == "yng"] <- "young"
+
+ctints_all_test_emi_var_yng <- ctints_all_test_emi_Test[ctints_all_test_emi_Test$age == "young",] %>%
+  group_by(ligands) %>%
+  summarise(yng_emi_var = var(ranks))
+
+ctints_all_test_emi_var_old <- ctints_all_test_emi_Test[ctints_all_test_emi_Test$age == "old",] %>%
+  group_by(ligands) %>%
+  summarise(old_emi_var = var(ranks))
+
+
+emi_var <- cbind(ctints_all_test_emi_var_old, ctints_all_test_emi_var_yng)
+emi_var <- emi_var %>%
+  pivot_longer(cols = c("old_emi_var", "yng_emi_var"), names_to = "age", values_to = "var")
+  
+emi_var$age[emi_var$age == "old_emi_var"] <- "old"
+emi_var$age[emi_var$age == "yng_emi_var"] <- "young"
+emi_var$age <- factor(emi_var$age, levels = c("young", "old"))
+
+```
+
+```{r}
+
+median_ligand <- emi_var %>%
+  group_by(age) %>%
+  summarise(med_lig = median(var))
+
+plot_ligand_var <- ggplot(emi_var, aes(x = age, y = var, color = age))+
+  geom_quasirandom(size = 0.3)+
+  geom_point(median_ligand, mapping = aes(y = med_lig), color = "black", 
+           fill = "orange",  shape = 22, size = 5, stroke = 1)
+
+plot_ligand_var
+
+median_ligand
+
+```
+
+```{r}
+
+ctints_all_test_rec_Test <- ctints_all_test_rec[,c(12:22, 34:44)]
+ctints_all_test_rec_Test <- rownames_to_column(ctints_all_test_rec_Test, "receptors")
+
+ctints_all_test_rec_Test <- ctints_all_test_rec_Test %>%
+  pivot_longer(cols = c(2:ncol(ctints_all_test_rec_Test)), values_to = "ranks",
+               names_to = "celltypes")
+
+ctints_all_test_rec_Test$age <- gsub("[[:print:]]+[_]", "", ctints_all_test_rec_Test$celltypes)
+ctints_all_test_rec_Test$age[ctints_all_test_rec_Test$age == "yng"] <- "young"
+
+ctints_all_test_rec_var_yng <- ctints_all_test_rec_Test[ctints_all_test_rec_Test$age == "young",] %>%
+  group_by(receptors) %>%
+  summarise(yng_rec_var = var(ranks))
+
+ctints_all_test_rec_var_old <- ctints_all_test_rec_Test[ctints_all_test_rec_Test$age == "old",] %>%
+  group_by(receptors) %>%
+  summarise(old_rec_var = var(ranks))
+
+
+rec_var <- cbind(ctints_all_test_rec_var_old, ctints_all_test_rec_var_yng)
+rec_var <- rec_var %>%
+  pivot_longer(cols = c("old_rec_var", "yng_rec_var"), names_to = "age", values_to = "var")
+  
+rec_var$age[rec_var$age == "old_rec_var"] <- "old"
+rec_var$age[rec_var$age == "yng_rec_var"] <- "young"
+rec_var$age <- factor(rec_var$age, levels = c("young", "old"))
+
+
+```
+
+```{r}
+
+median_receptor <- rec_var %>%
+  group_by(age) %>%
+  summarise(med_rec = median(var))
+  
+  
+plot_receptor_var <- ggplot(rec_var, aes(x = age, y = var, color = age))+
+  geom_quasirandom(size = 0.3)+
+  geom_point(median_receptor, mapping = aes(y = med_rec), color = "black", 
+           fill = "orange",  shape = 22, size = 5, stroke = 1)
+
+plot_receptor_var
+
+median_receptor
+
+```
+
+## Cell type interactions level
+
+### Overlap between age groups
+
+```{r}
+
+ctints_shared_age_list <- list()
+ctints_shared_age_vec <- vector()
+for(i in names(ctints_yng[[2]])){
+
+  shared_ints <- intersect(ctints_yng[[2]][[i]]$interactions, 
+                           ctints_old[[2]][[i]]$interactions)
+
+  unique_yng_ints <- ctints_yng[[2]][[i]]$interactions[
+    -which(ctints_yng[[2]][[i]]$interactions %in% shared_ints)]
+  unique_old_ints <- ctints_old[[2]][[i]]$interactions[
+    -which(ctints_old[[2]][[i]]$interactions %in% shared_ints)]
+  
+  
+  return_list <- list(
+    shared_ints = shared_ints,
+    unique_yng_ints = unique_yng_ints,
+    unique_old_ints = unique_old_ints
+  
+  )
+  
+  ctints_shared_age_list[[i]] <- return_list
+  ctints_shared_age_vec[i] <- length(shared_ints)
+}
+
+names(ctints_shared_age_list) <- names(ctints_yng[[2]])
+names(ctints_shared_age_vec) <- names(ctints_yng[[2]])
+
+```
+
+```{r}
+
+ctints_shared_age <- data.frame(
+  celltypes = names(col_cts_red),
+  annotation = c(rep("emitter", 11), rep("receiver", 11))
+)
+
+ctints_shared_age$shared <- vector(length = nrow(ctints_shared_age))
+ctints_shared_age$old <- vector(length = nrow(ctints_shared_age))
+ctints_shared_age$young <- vector(length = nrow(ctints_shared_age))
+
+
+for(i in unique(ctints_shared_age$celltype)){
+  
+  ctints_list <- ctints_shared_age_list[[i]]
+  
+  ctints_shared_age$shared[
+    ctints_shared_age$celltypes == i] <- length(ctints_list$shared_ints)
+  ctints_shared_age$old[
+    ctints_shared_age$celltypes == i] <- length(ctints_list$unique_old_ints)
+  ctints_shared_age$young[
+    ctints_shared_age$celltypes == i] <- length(ctints_list$unique_yng_ints)
+
+}
+
+ctints_shared_age$old_total <- ctints_shared_age$old + ctints_shared_age$shared
+ctints_shared_age$yng_total <- ctints_shared_age$young + ctints_shared_age$shared
+ctints_shared_age$order <- ctints_shared_age$shared
+
+ctints_shared_young <- pivot_longer(ctints_shared_age,
+                                     cols = c(3,5), names_to = "sample")
+
+ctints_shared_old <- pivot_longer(ctints_shared_age,
+                                     cols = c(3,4), names_to = "sample")
+
+ctints_shared_young$sample[ctints_shared_young$sample == "young"] <- "exclusively young"
+ctints_shared_old$sample[ctints_shared_old$sample == "old"] <- "exclusively old"
+
+ctints_shared_young$sample <- factor(ctints_shared_young$sample,
+                                      levels = c("exclusively young", "exclusively old", "shared"))
+ctints_shared_old$sample <- factor(ctints_shared_old$sample,
+                                      levels = c("exclusively young", "exclusively old", "shared"))
+
+```
+
+```{r}
+
+legend_plot <- ggplot(ctints_shared_young, 
+         aes(y = reorder(celltypes, order), x = value, fill = sample))+
+    geom_col(position = "stack")+
+    scale_fill_manual("", values = c("old" = col_age[[2]], 
+                                     "young" = col_age[[1]], 
+                                    shared = "orange"))
+
+legend_ctp_age <- get_legend(legend_plot)
+
+plot_ctints_age_emi <- ggarrange(
+  
+  ncol = 3,
+  widths = c(1, 1.35, 0.4),
+
+  ggplot(ctints_shared_young[ctints_shared_young$annotation == "emitter",], 
+         aes(y = reorder(celltypes, order), x = -value, fill = sample))+
+    geom_col(position = "stack")+
+    scale_fill_manual("", values = c("old" = col_age[[2]], 
+                                     "young" = col_age[[1]], 
+                                    shared = "orange"))+
+    theme_classic()+
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(-max_ctints, 0),
+                       breaks = c(-max_ctints, (-max_ctints* 0.5), 0),
+                       labels = c(max_ctints, (max_ctints* 0.5), 0))+
+    ylab("")+
+    xlab("Number of interactions")+
+    ggtitle(paste(species, "young"))+
+    theme(legend.position = "none"),
+ 
+  
+   ggplot(ctints_shared_old[ctints_shared_old$annotation == "emitter",], 
+         aes(y = reorder(celltypes, order), x = value, fill = sample))+
+    geom_col(position = "stack")+
+    scale_fill_manual("", values = c("old" = col_age[[2]], 
+                                     "young" = col_age[[1]], 
+                                    shared = "orange"))+
+    theme_classic()+
+    theme(axis.text.y = element_text(size = 9, hjust = 0.5),
+          axis.title.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(0, max_ctints),
+                       breaks = c(0, (max_ctints*0.5), max_ctints),
+                       labels = c(0, (max_ctints*0.5), max_ctints))+
+    ylab("Cell type pairs")+
+    xlab("Number of interactions")+
+    ggtitle(paste(species, "old"))+
+    theme(legend.position = "none"),
+  legend_ctp_age
+
+    
+)
+
+plot_ctints_age_rec <- ggarrange(
+  
+  ncol = 3,
+  widths = c(1, 1.5, 0.4),
+
+  ggplot(ctints_shared_young[ctints_shared_young$annotation == "receiver",], 
+         aes(y = reorder(celltypes, order), x = -value, fill = sample))+
+    geom_col(position = "stack")+
+    scale_fill_manual("", values = c("old" = col_age[[2]], 
+                                     "young" = col_age[[1]], 
+                                    shared = "orange"))+
+    theme_classic()+
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(-max_ctints, 0),
+                       breaks = c(-max_ctints, (-max_ctints* 0.5), 0),
+                       labels = c(max_ctints, (max_ctints* 0.5), 0))+
+    ylab("")+
+    xlab("Number of interactions")+
+    ggtitle(paste(species, "young"))+
+    theme(legend.position = "none"),
+ 
+  
+   ggplot(ctints_shared_old[ctints_shared_old$annotation == "receiver",], 
+         aes(y = reorder(celltypes, order), x = value, fill = sample))+
+    geom_col(position = "stack")+
+    scale_fill_manual("", values = c("old" = col_age[[2]], 
+                                     "young" = col_age[[1]], 
+                                    shared = "orange"))+
+    theme_classic()+
+    theme(axis.text.y = element_text(size = 9, hjust = 0.5),
+          axis.title.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(0, max_ctints),
+                       breaks = c(0, (max_ctints*0.5), max_ctints),
+                       labels = c(0, (max_ctints*0.5), max_ctints))+
+    ylab("Cell type pairs")+
+    xlab("Number of interactions")+
+    ggtitle(paste(species, "old"))+
+    theme(legend.position = "none"),
+  legend_ctp_age
+
+    
+)
+
+plot_ctints_age_emi
+plot_ctints_age_rec
+
+```
+
+```{r}
+
+ctints_shared_age$unique_percent_old <- ctints_shared_age$old/ctints_shared_age$old_total*100
+ctints_shared_age$unique_percent_yng <- ctints_shared_age$young/ctints_shared_age$yng_total*100
+
+
+ctints_shared_age_long <- ctints_shared_age %>%
+  pivot_longer(cols = c(9, 10), names_to = "age", values_to = "unique_percent")
+
+
+ctints_shared_age_long$annotation[ctints_shared_age_long$annotation == "emitter"] <- "Emitters"
+ctints_shared_age_long$annotation[ctints_shared_age_long$annotation == "receiver"] <- "Receivers"
+
+
+ctints_shared_age_long$age <- gsub("unique_percent_", "", ctints_shared_age_long$age)
+ctints_shared_age_long$age[ctints_shared_age_long$age == "yng"] <- "young"
+ctints_shared_age_long$age <- factor(ctints_shared_age_long$age, levels = c("young", "old"))
+
+
+plot_emirec_unique_ints <- ggplot(ctints_shared_age_long, 
+                             aes(x = annotation, y = unique_percent, 
+                                 color = age))+
+  geom_boxplot()
+
+plot_emirec_unique_ints
+
+```
+
+
+
+### Interaction overlap between cell types
+
+percentage of overlap
+
+```{r}
+
+ctints_binary_yng <- data.frame(row.names = cpi_yng$Interactions$interaction_pair)
+
+for(i in 1:length(names(ctints_yng[[2]]))){
+  ctints_binary_yng[,i] <- vector(length = nrow(ctints_binary_yng))
+
+}
+
+colnames(ctints_binary_yng) <- names(ctints_yng[[2]])
+
+for(j in 1:length(names(ctints_yng[[2]]))){
+  for(i in 1:nrow(ctints_binary_yng)){
+    if(rownames(ctints_binary_yng)[i] %in% ctints_yng[[2]][[j]]$interactions){
+      ctints_binary_yng[i,j] <- 1
+    }else{
+      ctints_binary_yng[i,j] <- 0
+    }
+  }
+}
+
+ctints_binary_yng$interaction_type <- cpi_yng$Interactions$interaction_type
+ctints_binary_yng <- ctints_binary_yng[rowMeans(ctints_binary_yng[,1:22]) > 0,]
+
+
+ctints_binary_old <- data.frame(row.names = cpi_old$Interactions$interaction_pair)
+
+for(i in 1:length(names(ctints_old[[2]]))){
+  ctints_binary_old[,i] <- vector(length = nrow(ctints_binary_old))
+
+}
+
+colnames(ctints_binary_old) <- names(ctints_old[[2]])
+
+for(j in 1:length(ctints_old[[2]])){
+  for(i in 1:nrow(ctints_binary_old)){
+    if(rownames(ctints_binary_old)[i] %in% ctints_old[[2]][[j]]$interactions){
+      ctints_binary_old[i,j] <- 1
+    }else{
+      ctints_binary_old[i,j] <- 0
+    }
+  }
+}
+
+ctints_binary_old$interaction_type <- cpi_old$Interactions$interaction_type
+ctints_binary_old <- ctints_binary_old[rowMeans(ctints_binary_old[,1:22]) > 0,]
+
+```
+
+
+```{r fig.width = 6}
+
+ctints_binary_yng$shared <- vector(length = nrow(ctints_binary_yng))
+ctints_binary_yng$shared_rec <- vector(length = nrow(ctints_binary_yng))
+ctints_binary_yng$shared_emi <- vector(length = nrow(ctints_binary_yng))
+ctints_binary_yng$shared_emi[rowMeans(ctints_binary_yng[1:11]) == 1] <- TRUE
+ctints_binary_yng$shared_rec[rowMeans(ctints_binary_yng[12:22]) == 1] <- TRUE
+ctints_binary_yng$shared[rowMeans(ctints_binary_yng[1:22]) == 1] <- TRUE
+
+
+ctints_yng_emi_plot <- upset(ctints_binary_yng,
+      intersect = colnames(ctints_binary_yng)[1:11],
+     sort_intersections_by = c("cardinality", "ratio"),
+      min_size = 15,
+      name = NULL,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared_emi),
+            width=0.8),
+            position='right')+
+          # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[1]]))+
+          ylab("Interactions/cell type")+
+          theme(axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                plot.background = element_blank())+
+        ylim(limits = c(0, max_ctints))),
+      guides='over',
+      matrix=(
+         intersection_matrix(
+            geom=geom_point())+
+           scale_y_discrete(labels = NULL)+
+           theme(legend.position = "none")),
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE,
+                                  mapping = aes(fill = interaction_type))+
+           # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+            scale_fill_manual("LRI annotation", values = col_itp)+
+            theme(axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank())+
+            ylab("Number of shared interactions")+
+              ylim(limits = c(0, 220))+
+              ggtitle(paste(species, "young", "emitters", sep = " "))
+        )
+    )
+)
+
+
+ctints_yng_rec_plot <- upset(ctints_binary_yng,
+      intersect = colnames(ctints_binary_yng)[12:22],
+     sort_intersections_by = c("cardinality", "ratio"),
+      min_size = 15,
+      name = NULL,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared_rec),
+            width=0.8),
+            position='right')+
+         # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[1]]))+
+          ylab("Interactions/cell type")+
+          theme(axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                plot.background = element_blank())+
+        ylim(limits = c(0, max_ctints))),
+      guides='over',
+      matrix=(
+         intersection_matrix(
+            geom=geom_point())+
+           scale_y_discrete(labels = NULL)+
+           theme(legend.position = "none")),
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE,
+                                  mapping = aes(fill = interaction_type))+
+            # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+            scale_fill_manual("LRI annotation", values = col_itp)+
+            theme(axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank())+
+            ylab("Number of shared interactions")+
+              ylim(limits = c(0, 220))+
+              ggtitle(paste(species, "young", "receivers", sep = " "))
+        )
+    )
+)
+
+
+ctints_yng_plot <- upset(ctints_binary_yng,
+      intersect = colnames(ctints_binary_yng[,1:22]),
+     sort_intersections_by = c("cardinality", "ratio"),
+     height_ratio = 0.8,
+      min_size = 15,
+      name = NULL,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared),
+            width=0.8),
+            position='right')+
+         # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[1]]))+
+          ylab("Interactions/cell type")+
+          theme(axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                plot.background = element_blank())+
+        ylim(limits = c(0, max_ctints))),
+      guides='over',
+      matrix=(
+         intersection_matrix(
+            geom=geom_point())+
+           scale_y_discrete(labels = NULL)+
+           theme(legend.position = "none")),
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE,
+                                  mapping = aes(fill = interaction_type))+
+           # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+            scale_fill_manual("LRI annotation", values = col_itp)+
+            theme(axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank())+
+            ylab("Number of shared interactions")+
+              ylim(limits = c(0, 220))+
+              ggtitle(paste(species, "young", "all cell types", sep = " "))
+        )
+    )
+)
+
+ctints_yng_emi_plot
+ctints_yng_rec_plot 
+ctints_yng_plot 
+
+```
+
+```{r fig.width = 6}
+
+ctints_binary_old$shared <- vector(length = nrow(ctints_binary_old))
+ctints_binary_old$shared_rec <- vector(length = nrow(ctints_binary_old))
+ctints_binary_old$shared_emi <- vector(length = nrow(ctints_binary_old))
+ctints_binary_old$shared_emi[rowMeans(ctints_binary_old[1:11]) == 1] <- TRUE
+ctints_binary_old$shared_rec[rowMeans(ctints_binary_old[12:22]) == 1] <- TRUE
+ctints_binary_old$shared[rowMeans(ctints_binary_old[1:22]) == 1] <- TRUE
+
+
+ctints_old_emi_plot <- upset(ctints_binary_old,
+      intersect = colnames(ctints_binary_old)[1:11],
+     sort_intersections_by = c("cardinality", "ratio"),
+      min_size = 15,
+      name = NULL,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared_emi),
+            width=0.8),
+            position='right')+
+         # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[2]]))+
+          ylab("Interactions/cell type")+
+          theme(axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                plot.background = element_blank())+
+        ylim(limits = c(0, max_ctints))),
+      guides='over',
+      matrix=(
+         intersection_matrix(
+            geom=geom_point())+
+           scale_y_discrete(labels = NULL)+
+           theme(legend.position = "none")),
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE,
+                                  mapping = aes(fill = interaction_type))+
+           # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+            scale_fill_manual("LRI annotation", values = col_itp)+
+            theme(axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank())+
+            ylab("Number of shared interactions")+
+              ylim(limits = c(0, 220))+
+              ggtitle(paste(species, "old", "emitters", sep = " "))
+        )
+    )
+)
+
+
+ctints_old_rec_plot <- upset(ctints_binary_old,
+      intersect = colnames(ctints_binary_old)[12:22],
+     sort_intersections_by = c("cardinality", "ratio"),
+      min_size = 15,
+      name = NULL,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared_rec),
+            width=0.8),
+            position='right')+
+        # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+          # individual
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[1]]))+
+          ylab("Interactions/cell type")+
+          theme(axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                plot.background = element_blank())+
+        ylim(limits = c(0, max_ctints))),
+      guides='over',
+      matrix=(
+         intersection_matrix(
+            geom=geom_point())+
+           scale_y_discrete(labels = NULL)+
+           theme(legend.position = "none")),
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE,
+                                  mapping = aes(fill = interaction_type))+
+           # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+            scale_fill_manual("LRI annotation", values = col_itp)+
+            theme(axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank())+
+            ylab("Number of shared interactions")+
+              ylim(limits = c(0, 220))+
+              ggtitle(paste(species, "old", "receivers", sep = " "))
+        )
+    )
+)
+
+
+ctints_old_plot <- upset(ctints_binary_old,
+      intersect = colnames(ctints_binary_old[,1:22]),
+     sort_intersections_by = c("cardinality", "ratio"),
+      min_size = 10,
+     height_ratio = 0.8,
+      name = NULL,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared),
+            width=0.8),
+            position='right')+
+          # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[1]]))+
+          ylab("Interactions/cell type")+
+          theme(axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                plot.background = element_blank())+
+        ylim(limits = c(0, max_ctints))),
+      guides='over',
+      matrix=(
+         intersection_matrix(
+            geom=geom_point())+
+           scale_y_discrete(labels = NULL)+
+           theme(legend.position = "none")),
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE,
+                                  mapping = aes(fill = interaction_type))+
+            # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+            scale_fill_manual("LRI annotation", values = col_itp)+
+            theme(axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank())+
+            ylab("Number of shared interactions")+
+              ylim(limits = c(0, 220))+
+              ggtitle(paste(species, "old", "all cell types", sep = " "))
+        )
+    )
+)
+
+ctints_old_emi_plot
+ctints_old_rec_plot 
+ctints_old_plot
+
+```
+
+
+## Cell type pair level
+
+### Overlap between age groups
+
+get a list of shared, exclusively young and exclusively old interactions.
+
+```{r}
+
+ctpints_shared_age_list <- list()
+ctpints_shared_age_vec <- vector()
+for(i in 1:length(names(ctpints_yng[[2]]))){
+
+  shared_intsctp <- intersect(ctpints_yng[[2]][[i]]$interaction, ctpints_old[[2]][[i]]$interaction)
+
+  unique_yng_intsctp <- ctpints_yng[[2]][[i]]$interaction[-which(ctpints_yng[[2]][[i]]$interaction %in% shared_intsctp)]
+  unique_old_intsctp <- ctpints_old[[2]][[i]]$interaction[-which(ctpints_old[[2]][[i]]$interaction %in% shared_intsctp)]
+  
+  print(i)
+  print(grep("Rims2&Abca1",unique_old_intsctp ))
+  
+  return_list <- list(
+    shared_intsctp = shared_intsctp,
+    unique_yng_intsctp = unique_yng_intsctp,
+    unique_old_intsctp = unique_old_intsctp
+  
+  )
+  
+  ctpints_shared_age_list[[i]] <- return_list
+  ctpints_shared_age_vec[i] <- length(shared_intsctp)
+  
+}
+
+names(ctpints_shared_age_list) <- names(ctpints_yng[[2]])
+names(ctpints_shared_age_vec) <- names(ctpints_yng[[2]])
+
+which(ctpints_old[[2]][[21]]$interaction == "Rims2&Abca1")
+ctpints_yng[[2]][[47]]
+
+grep("Rims2&Abca1", ctpints_old[[2]][[47]]$interaction )
+
+cpi_old$Score[rownames(cpi_old$Score) == "Rims2&Abca1",]
+rowMeans(cpi_old$Score[rownames(cpi_old$Score) == "Rims2&Abca1",], na.rm = TRUE)
+rowMeans(cpi_old$Score[rownames(cpi_old$Score) == "Rims2&Abca1",], na.rm = TRUE)
+rowMeans(cpi_old$Score, na.rm = TRUE)
+
+```
+
+make dataframes for visualisation
+
+```{r}
+
+ctpints_shared_age <- data.frame(
+  ct_pair = names(ctpints_yng[[2]])
+)
+
+ctpints_shared_age$shared <- vector(length = nrow(ctpints_shared_age))
+ctpints_shared_age$old <- vector(length = nrow(ctpints_shared_age))
+ctpints_shared_age$young <- vector(length = nrow(ctpints_shared_age))
+
+
+for(i in unique(ctpints_shared_age$ct_pair)){
+  
+  ctpints_list <- ctpints_shared_age_list[[i]]
+  
+  ctpints_shared_age$shared[
+    ctpints_shared_age$ct_pair == i] <- length(ctpints_list$shared_intsctp)
+  ctpints_shared_age$old[
+    ctpints_shared_age$ct_pair == i] <- length(ctpints_list$unique_old_intsctp)
+  ctpints_shared_age$young[
+    ctpints_shared_age$ct_pair == i] <- length(ctpints_list$unique_yng_intsctp)
+
+}
+
+ctpints_shared_age$old_total <- ctpints_shared_age$old + ctpints_shared_age$shared
+ctpints_shared_age$yng_total <- ctpints_shared_age$young + ctpints_shared_age$shared
+ctpints_shared_age$order <- ctpints_shared_age$shared
+
+ctpints_shared_age$emitter <- ctpints_yng$overview$emitter[
+  match( ctpints_shared_age$ct_pair, ctpints_yng$overview$ct_pairs)]
+ctpints_shared_age$receiver <- ctpints_yng$overview$receiver[
+  match(ctpints_shared_age$ct_pair, ctpints_yng$overview$ct_pairs)]
+
+ctpints_shared_age$perc_unique_old <- ctpints_shared_age$old / ctpints_shared_age$old_total * 100
+ctpints_shared_age$perc_unique_yng <- ctpints_shared_age$young / ctpints_shared_age$yng_total * 100
+
+ctpints_shared_age$perc_shared_old <- ctpints_shared_age$shared / ctpints_shared_age$old_total * 100
+ctpints_shared_age$perc_shared_yng <- ctpints_shared_age$shared / ctpints_shared_age$yng_total * 100
+
+
+ctpints_shared_age$ratio_oy <- ctpints_shared_age$young / ctpints_shared_age$old
+
+
+ctpints_shared_young <- pivot_longer(ctpints_shared_age,
+                                     cols = c(2,4), names_to = "sample")
+
+ctpints_shared_old <- pivot_longer(ctpints_shared_age,
+                                     cols = c(2,3), names_to = "sample")
+
+ctpints_shared_young$sample[ctpints_shared_young$sample == "young"] <- "exclusively young"
+ctpints_shared_old$sample[ctpints_shared_old$sample == "old"] <- "exclusively old"
+
+ctpints_shared_young$sample <- factor(ctpints_shared_young$sample,
+                                      levels = c("exclusively young", "exclusively old", "shared"))
+ctpints_shared_old$sample <- factor(ctpints_shared_old$sample,
+                                      levels = c("exclusively young", "exclusively old", "shared"))
+
+ctpints_shared_age$emitter <- factor(ctpints_shared_age$emitter,
+                                     levels = rev(names(col_emi_red)))
+ctpints_shared_age$receiver <- factor(ctpints_shared_age$receiver,
+                                     levels = rev(names(col_rec_red)))
+ 
+```
+
+visualise all
+
+```{r}
+
+legend_plot <- ggplot(ctpints_shared_young, 
+         aes(y = reorder(ct_pair, order), x = -value, fill = sample))+
+    geom_col(position = "stack")+
+    scale_fill_manual("", values = c("old" = col_age[[2]], 
+                                     "young" = col_age[[1]], 
+                                    shared = "orange"))
+
+legend_ctp_age <- get_legend(legend_plot)
+
+plot_ctp_age <- ggarrange(
+  
+  ncol = 3,
+
+  ggplot(ctpints_shared_young, 
+         aes(y = reorder(ct_pair, order), x = -value, fill = sample))+
+    geom_col(position = "stack")+
+    scale_fill_manual("", values = c("old" = col_age[[2]], 
+                                     "young" = col_age[[1]], 
+                                    shared = "orange"))+
+    theme_classic()+
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(-max_ctpints, 0),
+                       breaks = c(-max_ctpints, (-max_ctpints* 0.5), 0),
+                       labels = c(max_ctpints, (max_ctpints* 0.5), 0))+
+    ylab("")+
+    xlab("Number of interactions")+
+    ggtitle(paste(species, "young"))+
+    theme(legend.position = "none"),
+ 
+  
+   ggplot(ctpints_shared_old, 
+         aes(y = reorder(ct_pair, order), x = value, fill = sample))+
+    geom_col(position = "stack")+
+    scale_fill_manual("", values = c("old" = col_age[[2]], 
+                                     "young" = col_age[[1]], 
+                                    shared = "orange"))+
+    theme_classic()+
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(0, max_ctpints),
+                       breaks = c(0, (max_ctpints*0.5), max_ctpints),
+                       labels = c(0, (max_ctpints*0.5), max_ctpints))+
+    ylab("Cell type pairs")+
+    xlab("Number of interactions")+
+    ggtitle(paste(species, "old"))+
+    theme(legend.position = "none"),
+  legend_ctp_age
+)
+
+plot_ctp_age
+
+```
+
+percentage of shared interactions of total number of interactions
+for each cell type pair.
+
+```{r}
+
+ctpints_shared_age_test <- ctpints_shared_age
+ctpints_shared_age_test$emitter <- unfactor(ctpints_shared_age$receiver)
+
+ctpints_shared_age$annotation <- "emitter"
+ctpints_shared_age_test$annotation <- "receiver"
+
+ctpints_shared_age_test_rev <- rbind(ctpints_shared_age, ctpints_shared_age_test)
+
+ctpints_shared_age_test_rev$emitter <- factor(ctpints_shared_age_test_rev$emitter,
+                                          levels = names(col_cts_red))
+
+
+ggplot(ctpints_shared_age_test_rev, aes(x = emitter))+
+  geom_quasirandom(aes(y = perc_unique_yng), color = col_age[[1]])+
+  geom_quasirandom(aes(y = perc_unique_old), color = col_age[[2]])+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Percentage of unique interactions")+
+  xlab("Emitters")+
+  ylim(limits = c(0, 100))
+
+
+
+
+```
+
+### Interaction overlap within cell type pairs
+
+```{r}
+
+# can easily transform score into binary matrix 
+ctp_binary_yng <- cpi_yng$Score
+ctp_binary_yng[!is.na(ctp_binary_yng)] <- 1
+ctp_binary_yng[is.na(ctp_binary_yng)] <- 0
+
+ctp_binary_old <- cpi_old$Score
+ctp_binary_old[!is.na(ctp_binary_old)] <- 1
+ctp_binary_old[is.na(ctp_binary_old)] <- 0
+
+ctp_binary_yng$interaction_type <- cpi_yng$Interactions$interaction_type
+ctp_binary_old$interaction_type <- cpi_old$Interactions$interaction_type
+
+ctp_binary_yng <- ctp_binary_yng[rowMeans(ctp_binary_yng[,1:121]) > 0,]
+ctp_binary_old <- ctp_binary_old[rowMeans(ctp_binary_old[,1:121]) > 0,]
+
+```
+
+#### Total
+
+```{r fig.height = 14, fig.width = 7}
+
+ctp_binary_yng$shared <- vector(length = nrow(ctp_binary_yng))
+ctp_binary_yng$shared[rowMeans(ctp_binary_yng[1:121]) == 1] <- TRUE
+
+ctpints_yng_plot <-upset(ctp_binary_yng,
+      intersect = colnames(ctp_binary_yng)[1:121],
+     sort_intersections_by = c("cardinality", "ratio"),
+      min_size = 5,
+      height_ratio = 4,
+      name = NULL,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared),
+            width=0.8),
+            position='right')+
+          # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[2]]))+
+          ylab("Interactions/cell type pair")+
+          theme(axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                plot.background = element_blank())+
+        ylim(limits = c(0, max_ctpints))),
+      guides='over',
+      matrix=(
+         intersection_matrix(
+            geom=geom_point(size=0.2))+
+           scale_y_discrete(labels = NULL)+
+           theme(legend.position = "none")),
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE,
+                                  mapping = aes(fill = interaction_type))+
+           # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+            scale_fill_manual("LRI annotation", values = col_itp)+
+            theme(axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank())+
+            ylab("Number of shared interactions")+
+              ylim(limits = c(0,50))
+        )
+    )
+)
+
+
+ctp_binary_old$shared <- vector(length = nrow(ctp_binary_old))
+ctp_binary_old$shared[rowMeans(ctp_binary_old[1:121]) == 1] <- TRUE
+
+labels <- as.character(c(1:121))
+
+ctpints_old_plot <- upset(ctp_binary_old,
+      intersect = colnames(ctp_binary_old)[1:121],
+      sort_intersections_by = c("cardinality", "ratio"),
+      min_size = 5,
+      height_ratio = 4,
+      name = NULL,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared),
+            width=0.8),
+            position='right')+
+         # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[2]]))+
+          ylab("Interactions/cell type pair")+
+          theme(axis.text.y = element_blank(),
+                axis.title.y = element_blank(),
+                axis.ticks.y = element_blank(),
+                plot.background = element_blank())+
+          ylim(c(0, max_ctpints))),
+      guides='over',
+      matrix=(
+         intersection_matrix(
+            geom=geom_point(size=0.2))+
+           scale_y_discrete(labels = NULL)+
+           theme(legend.position = "none")),
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE,
+                                  mapping = aes(fill = interaction_type))+
+            # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+            scale_fill_manual("LRI annotation", values = col_itp)+
+            theme(axis.text.x = element_blank(),
+                  axis.ticks.x = element_blank())+
+            ylab("Number of shared interactions")+
+              ylim(limits = c(0,50))
+      
+      )
+    )
+)
+
+ctpints_yng_plot
+ctpints_old_plot
+
+```
+
+#### Cell type pair-wise
+
+```{r fig.width = 6}
+
+ctp_binary_subset_yng <- list()
+for(i in names(col_cts_red)){
+  
+  subset <- ctp_binary_yng[,grep(i, colnames(ctp_binary_yng))]
+  subset$interaction_type <- ctp_binary_yng[,122]
+  subset <- subset[rowMeans(subset[,1:11]) > 0,]
+
+  ctp_binary_subset_yng[[i]] <- subset
+                           
+}
+
+ctp_binary_subset_old <- list()
+for(i in names(col_cts_red)){
+  
+  subset <- ctp_binary_old[,grep(i, colnames(ctp_binary_yng)[1:121])]
+  subset$interaction_type <- ctp_binary_old[,122]
+  subset <- subset[rowMeans(subset[,1:11]) > 0,]
+
+  ctp_binary_subset_old[[i]] <- subset
+                           
+}
+
+```
+
+```{r, fig.width = 7, fig.height=7}
+
+up_plot_list_yng <- list()
+for(i in 1:length(ctp_binary_subset_yng)){
+  
+  ctp_binary_subset_yng[[i]]$shared <- vector(
+    length = nrow(ctp_binary_subset_yng[[i]]))
+  ctp_binary_subset_yng[[i]]$shared[
+    rowMeans(ctp_binary_subset_yng[[i]][1:11]) == 1] <- TRUE
+
+  up_plot <- upset(ctp_binary_subset_yng[[i]],
+      intersect = colnames(ctp_binary_subset_yng[[i]][1:11]),
+      sort_intersections_by = c("cardinality", "ratio"),
+      min_size = 3,
+      height_ratio = 1,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared),
+                width=0.8),
+            position='right')+
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[2]]))+
+          ylab("Number of interactions per cell type pair")+
+          ylim(limits = c(0, max_ctpints))),
+      guides='over',
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE,
+                                  mapping = aes(fill = interaction_type))+
+                  theme_classic()+
+                  scale_fill_manual("LRI annotation", values = col_itp)+
+                  theme(axis.text.x = element_blank(),
+                        axis.ticks.x = element_blank())+
+                  ylab("Number of shared interactions")+
+                  ylim(limits = c(0, 160))+
+                  ggtitle(paste(species, "young", sep = " "))
+      )
+    )
+  )
+  
+  up_plot_list_yng[[i]] <- up_plot
+
+}
+
+names(up_plot_list_yng) <- names(col_cts_red)
+up_plot_list_yng
+
+```
+
+```{r fig.width = 7, fig.height=7}
+
+up_plot_list_old <- list()
+for(i in 1:length(ctp_binary_subset_old)){
+  
+  ctp_binary_subset_old[[i]]$shared <- vector(
+    length = nrow(ctp_binary_subset_old[[i]]))
+  ctp_binary_subset_old[[i]]$shared[
+    rowMeans(ctp_binary_subset_old[[i]][1:11]) == 1] <- TRUE
+
+  up_plot <- upset(ctp_binary_subset_old[[i]],
+      intersect = colnames(ctp_binary_subset_old[[i]][1:11]),
+      sort_intersections_by = c("cardinality", "ratio"),
+      min_size = 3,
+      height_ratio = 1,
+      set_sizes=(
+        upset_set_size(
+          geom=geom_bar(
+            aes(fill=shared),
+                width=0.8),
+            position='right')+
+          scale_fill_manual("Shared with all",
+                            values = c("TRUE" = "orange", 
+                                       "FALSE" = col_age[[2]]))+
+          ylab("Number of interactions per cell type pair")+
+          ylim(limits = c(0, max_ctpints))),
+      guides='over',
+      base_annotations = list(
+        'Size'=(intersection_size(counts=FALSE,
+                                  mapping = aes(fill = interaction_type))+
+                  theme_classic()+
+                  scale_fill_manual("LRI annotation", values = col_itp)+
+                  theme(axis.text.x = element_blank(),
+                        axis.ticks.x = element_blank())+
+                  ylab("Number of shared interactions")+
+                  ylim(limits = c(0, 160))+
+                  ggtitle(paste(species, "old", sep = " "))
+      )
+    )
+  )
+  
+  up_plot_list_old[[i]] <- up_plot
+
+}
+
+names(up_plot_list_old) <- names(col_cts_red)
+up_plot_list_old
+
+
+```
+
+Look at the percentage of shared interactions again, this time for within
+cell type pair sharing.
+
+```{r}
+
+ctp_perc_yng <- data.frame(ct_pairs = colnames(cpi_yng$Score))
+ctp_perc_yng$emitter <- cpi_yng$Celltypes$emitter
+ctp_perc_yng$receiver <- cpi_yng$Celltypes$receiver
+ctp_perc_yng$perc_sharedints <- vector(length = nrow(ctp_perc_yng))
+ctp_perc_yng$age <- "young"
+
+for(i in 1:length(ctp_binary_subset_yng)){
+  
+  for(j in colnames(
+    ctp_binary_subset_yng[[i]])[1:(ncol(ctp_binary_subset_yng[[i]]) - 2)]){
+    
+    temp_subset <- ctp_binary_subset_yng[[i]][
+      c(which(colnames(ctp_binary_subset_yng[[i]]) == j), 
+        which(colnames(ctp_binary_subset_yng[[i]]) == "shared"))]
+    
+    temp_subset <- temp_subset[which(temp_subset[,1] == 1),]
+    
+    ctp_perc_yng$perc_sharedints[
+      ctp_perc_yng$ct_pairs == j] <- length(which(
+        temp_subset$shared == TRUE))/nrow(temp_subset) * 100
+  }
+}
+
+
+
+ctp_perc_old <- data.frame(ct_pairs = colnames(cpi_old$Score))
+ctp_perc_old$emitter <- cpi_old$Celltypes$emitter
+ctp_perc_old$receiver <- cpi_old$Celltypes$receiver
+ctp_perc_old$perc_sharedints <- vector(length = nrow(ctp_perc_old))
+ctp_perc_old$age <- "old"
+
+for(i in 1:length(ctp_binary_subset_old)){
+  
+  for(j in colnames(
+    ctp_binary_subset_old[[i]])[1:(ncol(ctp_binary_subset_old[[i]]) - 2)]){
+    
+    temp_subset <- ctp_binary_subset_old[[i]][
+      c(which(colnames(ctp_binary_subset_old[[i]]) == j), 
+        which(colnames(ctp_binary_subset_old[[i]]) == "shared"))]
+    
+    temp_subset <- temp_subset[which(temp_subset[,1] == 1),]
+    
+    ctp_perc_old$perc_sharedints[
+      ctp_perc_old$ct_pairs == j] <- length(which(
+        temp_subset$shared == TRUE))/nrow(temp_subset) * 100
+  }
+}
+
+ctp_perc <- rbind(ctp_perc_yng, ctp_perc_old)
+ctp_perc$emitter <- factor(ctp_perc$emitter, 
+                           levels = names(col_emi_red))
+ctp_perc$receiver <- factor(ctp_perc$receiver, 
+                           levels = names(col_rec_red))
+
+```
+
+```{r}
+
+ggplot(ctp_perc, aes(x = emitter, y = perc_sharedints, color = age))+
+  geom_quasirandom(size = 0.6)+
+  theme_classic()+
+  scale_color_manual("Age", values = col_age)+
+  ylim(limits = c(0,100))+
+  ylab(expression(atop("Nr interactions shared within cell type/",
+                       paste("Nr total interactions per cell type pair [%]"))))+
+  xlab("Emitter")+
+  theme(axis.text.x = element_text(angle = 90))
+
+ggplot(ctp_perc, aes(x = receiver, y = perc_sharedints, color = age))+
+  geom_quasirandom(size = 0.6)+
+  theme_classic()+
+  scale_color_manual("Age", values = col_age)+
+  ylim(limits = c(0,100))+
+  ylab(expression(atop("Nr interactions shared within cell type/",
+                       paste("Nr total interactions per cell type pair [%]"))))+
+  xlab("Receiver")+
+  theme(axis.text.x = element_text(angle = 90))
+
+
+```
+
+## Directly compare interesting interactomes
+
+```{r}
+
+min_score <- min(cpi_both$Score[cpi_both$Score != 0])
+
+zero_to_min = rep(viridis(n = 1, option = "D", begin = 0.3, end = 0.3), min_score*100)
+min_to_1 = viridis(n = c((min_score*100:100)), option = "D", begin = 0.3, end = 1)
+
+
+cols = c(zero_to_min, min_to_1)
+
+mypalette <- colorRampPalette(cols)(255)
+
+
+```
+
+```{r}
+
+cpi_both_perc <- cpi_both
+score_df_both_temp <- score_df_both
+score_df_both_temp$ct_pair[score_df_both_temp$age == "young"] <- paste0(
+  score_df_both_temp$ct_pair[score_df_both_temp$age == "young"], "_yng")
+score_df_both_temp$ct_pair[score_df_both_temp$age == "old"] <- paste0(
+  score_df_both_temp$ct_pair[score_df_both_temp$age == "old"], "_old")
+colnames(cpi_both_perc$Score) <- gsub("mmus_", "", colnames(cpi_both_perc$Score))
+
+for(i in 1:nrow(cpi_both_perc$Score)){
+  for(j in 1:ncol(cpi_both_perc$Score)){
+    
+    if(cpi_both_perc$Score[i, j] != 0){
+      cpi_both_perc$Score[i, j] <- score_df_both_temp$score_percentile[
+        intersect(which(score_df_both_temp$interaction == rownames(cpi_both_perc$Score)[i]),
+                  which(score_df_both_temp$ct_pair == colnames(cpi_both_perc$Score)[j]))]
+    }
+  }
+}
+
+
+```
+
+```{r}
+
+min_score <- min(cpi_both_perc$Score[cpi_both_perc$Score != 0])
+
+zero_to_min = rep(viridis(n = 1, option = "D", begin = 0.3, end = 0.3), min_score*100)
+min_to_1 = viridis(n = c((min_score*100:100)), option = "D", begin = 0.3, end = 1)
+
+
+cols = c(zero_to_min, min_to_1)
+
+mypalette <- colorRampPalette(cols)(255)
+
+```
+
+
+```{r}
+
+plot_list_HM_leg <-list()
+for(i in names(col_cts_red)){
+  
+  print(i)
+  
+  cpi_temp <- cpi_both_perc
+  cpi_temp$Score <- cpi_both_perc$Score[,grep(i, colnames(cpi_temp$Score))]
+  cpi_temp$Interactions <- cpi_temp$Interactions[-rowMeans(cpi_temp$Score) != 0,]
+  cpi_temp$Celltypes <- cpi_temp$Celltypes[grep(i, cpi_temp$Celltypes$ct_pair),]
+  cpi_temp$Score <- cpi_temp$Score[-rowMeans(cpi_temp$Score) != 0,]
+
+  if(i %in% names(col_emi_red)){
+    partners <- cpi_temp$Celltypes$receiver
+    col <- col_rec_red
+    col_ct <- col_emi_red[[i]]
+    names(col_ct) <- i
+  }else if(i %in% names(col_rec_red)){
+    partners <- cpi_temp$Celltypes$emitter
+    col <- col_emi_red
+    col_ct <- col_rec_red[[i]]
+    names(col_ct) <- i
+  }
+  
+  anno_col <- data.frame(
+    row.names = colnames(cpi_temp$Score),
+    Age = cpi_temp$Celltypes$Age,
+    "Partner" = partners
+    )
+
+  # colours
+  heatmap_col <- list(
+    Age = col_age,
+    "Partner" = col,
+    Interactiontype = col_itp
+    )
+
+  plot <- as.ggplot(pheatmap(cpi_temp$Score,
+         show_colnames = FALSE,
+         show_rownames = FALSE,
+         cluster_rows =  TRUE,
+         treeheight_row = 0,
+         treeheight_col = 22,
+         annotation_col = anno_col,
+         annotation_colors = heatmap_col,
+         color =  viridis(n = 100, option = "D", begin = 0, end = 1),
+         fontsize = 12
+         ))
+
+  plot_list_HM_leg[[i]] <- plot
+}
+
+```
+
+```{r}
+
+plot_list_HM <-list()
+
+for(i in names(col_cts_red)){
+  
+  cpi_temp <- cpi_both_perc
+  cpi_temp$Score <- cpi_both_perc$Score[,grep(i, colnames(cpi_temp$Score))]
+  cpi_temp$Interactions <- cpi_temp$Interactions[-rowMeans(cpi_temp$Score) != 0,]
+  cpi_temp$Celltypes <- cpi_temp$Celltypes[grep(i, cpi_temp$Celltypes$ct_pair),]
+  cpi_temp$Score <- cpi_temp$Score[-rowMeans(cpi_temp$Score) != 0,]
+
+  if(i %in% names(col_emi_red)){
+    partners <- cpi_temp$Celltypes$receiver
+    col <- col_rec_red
+    col_ct <- col_emi_red[[i]]
+    names(col_ct) <- i
+  }else if(i %in% names(col_rec_red)){
+    partners <- cpi_temp$Celltypes$emitter
+    col <- col_emi_red
+    col_ct <- col_rec_red[[i]]
+    names(col_ct) <- i
+  }
+  
+  anno_col <- data.frame(
+    row.names = colnames(cpi_temp$Score),
+    Age = cpi_temp$Celltypes$Age,
+    "Partner" = partners
+    )
+
+  # colours
+  heatmap_col <- list(
+    Age = col_age,
+    "Partner" = col,
+    Interactiontype = col_itp
+    )
+  
+  plot <- as.ggplot(pheatmap(cpi_temp$Score,
+         show_colnames = FALSE,
+         show_rownames = FALSE,
+         cluster_rows =  TRUE,
+         treeheight_row = 0,
+          treeheight_col = 22,
+          annotation_col = anno_col,
+         annotation_colors = heatmap_col,
+         color = viridis(n = 100, option = "D", begin = 0, end = 1),
+         annotation_legend = FALSE,
+         fontsize = 12
+         ))
+
+  plot_list_HM[[i]] <- plot
+}
+
+col_cts_red
+
+```
+
+### Distribution of Scores across cell types
+
+```{r}
+
+median_emi <- score_df_yng %>%
+  group_by(emitter) %>%
+  summarise(median_val = median(emi_var, na.rm = TRUE))
+
+plot_young_emi_scores <- ggplot(score_df_yng, aes(y = emi_var, 
+                                                x = emitter, color = emitter))+
+  geom_quasirandom(size = 0.3)+
+  geom_point(median_emi, mapping = aes(y = median_val), color = "black", 
+           fill = "white",  shape = 22, size = 3)
+
+median_rec <- score_df_yng %>%
+  group_by(receiver) %>%
+  summarise(median_val = median(rec_var, na.rm = TRUE))
+
+plot_young_rec_scores <- ggplot(score_df_yng, aes(y = rec_var, 
+                                                x = receiver, color = receiver))+
+  geom_quasirandom(size = 0.3)+
+  geom_point(median_rec, mapping = aes(y = median_val), color = "black", 
+           fill = "white",  shape = 22, size = 3, stroke = 1)
+
+plot_young_emi_scores
+plot_young_rec_scores
+
+```
+
+One example
+
+
+```{r}
+
+var <- modelGeneVar(cpi_both$Score)
+top_hvg30 <- getTopHVGs(var, var.field = "bio", n = 30)
+
+```
+
+
+```{r}
+
+top_30_pos <- score_df_yng[score_df_yng$interaction %in% top_hvg30,]
+
+fibrchr_pos <- score_df_yng[score_df_yng$emitter == "Fibro/Chondro progs",]
+
+ex_pos_lig <- intersect(top_30_pos, fibrchr_pos)
+
+plot_fibrochondro_percentile <- ggplot(ex_pos_lig, 
+       aes(y = interaction, x = score_percentile, color = emitter))+
+  geom_boxplot(color = col_cts_all["Fibro/Chondro progs"])
+
+
+mono_rec <- score_df_yng[score_df_yng$receiver == "Monocyte-primed progs",]
+
+ex_pos_rec <- intersect(top_30_pos, mono_rec)
+
+plot_mono_percentile <- ggplot(ex_pos_rec, 
+       aes(y = interaction, x = score_percentile, color = receiver))+
+  geom_boxplot(color = col_cts_all["Monocyte-primed progs"])
+
+plot_fibrochondro_percentile
+plot_mono_percentile
+```
+
+## SCORES
+
+```{r}
+
+median_emi <- score_df_old %>%
+  group_by(emitter) %>%
+  summarise(median_val = median(emi_var, na.rm = TRUE))
+
+plot_old_emi_scores <- ggplot(score_df_old, aes(y = emi_var,
+                                              x = emitter, color = emitter))+
+  geom_quasirandom(size = 0.3)+
+  geom_point(median_emi, mapping = aes(y = median_val), color = "black", 
+           fill = "white",  shape = 22, size = 3)
+
+median_rec <- score_df_old %>%
+  group_by(receiver) %>%
+  summarise(median_val = median(rec_var, na.rm = TRUE))
+
+plot_old_rec_scores <- ggplot(score_df_old, aes(y = rec_var, x = receiver, color = receiver))+
+  geom_quasirandom(size = 0.3)+
+  geom_point(median_rec, mapping = aes(y = median_val), color = "black", 
+           fill = "white",  shape = 22, size = 3, stroke = 1)
+
+plot_old_emi_scores
+plot_old_rec_scores
+
+```
+
+
+```{r}
+
+score_df_both$age <- factor(score_df_both$age, levels = c("young", "old"))
+
+median_emi_both <- score_df_both %>%
+  group_by(age) %>%
+  summarise(median_val = median(emi_var, na.rm = TRUE))
+
+
+plot_both_emi_scores <- ggplot(score_df_both, aes(y = emi_var,
+                                                x = age, color = age))+
+  geom_quasirandom(size = 0.3)+
+  geom_point(median_emi_both, mapping = aes(y = median_val), color = "black", 
+           fill = "white",  shape = 22, size = 3, stroke = 1)
+
+median_rec_both <- score_df_both %>%
+  group_by(age) %>%
+  summarise(median_val = median(rec_var, na.rm = TRUE))
+
+
+plot_both_rec_scores <- ggplot(score_df_both, aes(y = rec_var,
+                                                x = age, color = age))+
+  geom_quasirandom(size = 0.3)+
+  geom_point(median_rec_both, mapping = aes(y = median_val), color = "black", 
+           fill = "white",  shape = 22, size = 3, stroke = 1)
+
+plot_both_emi_scores
+plot_both_rec_scores
+
+```
+
+## both at once
+
+```{r}
+
+median_emi_yng <- score_df_yng %>%
+  group_by(emitter) %>%
+  summarise(median_val = median(emi_var, na.rm = TRUE))
+
+median_emi_yng$age <- "young"
+
+median_emi_old <- score_df_old %>%
+  group_by(emitter) %>%
+  summarise(median_val = median(emi_var, na.rm = TRUE))
+
+median_emi_old$age <- "old"
+
+
+median_emi_both <- rbind(median_emi_yng, median_emi_old)
+median_emi_both$age <- factor(median_emi_both$age, levels = c("young", "old"))
+score_df_both$age <- factor(score_df_both$age, levels = c("young", "old"))
+
+plot_both_emi_scores <- ggplot(score_df_both, aes(y = emi_var,
+                                              x = emitter, color = emitter))+
+  geom_quasirandom(size = 0.3)+
+  geom_point(median_emi_both, mapping = aes(y = median_val), color = "black", 
+           fill = "white",  shape = 22, size = 3)+
+  facet_grid(cols = vars(age))
+
+plot_both_emi_scores
+
+```
+
+```{r}
+
+median_rec_yng <- score_df_yng %>%
+  group_by(receiver) %>%
+  summarise(median_val = median(rec_var, na.rm = TRUE))
+
+median_rec_yng$age <- "young"
+
+median_rec_old <- score_df_old %>%
+  group_by(receiver) %>%
+  summarise(median_val = median(rec_var, na.rm = TRUE))
+
+median_rec_old$age <- "old"
+
+
+median_rec_both <- rbind(median_rec_yng, median_rec_old)
+median_rec_both$age <- factor(median_rec_both$age, levels = c("young", "old"))
+
+plot_both_rec_scores <- ggplot(score_df_both, aes(y = rec_var,
+                                              x = receiver, color = receiver))+
+  geom_quasirandom(size = 0.3)+
+  geom_point(median_rec_both, mapping = aes(y = median_val), color = "black", 
+           fill = "white",  shape = 22, size = 3)+
+  facet_grid(cols = vars(age))
+
+plot_both_rec_scores
+
+```
+

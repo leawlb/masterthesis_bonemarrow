@@ -1,0 +1,613 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+"Global impact of ageing".
+
+# Preparation
+
+## Libraries
+
+```{r libraries, message = FALSE}
+
+library(SingleCellExperiment)
+library(rlist)
+library(tidyverse)
+library(eulerr)
+library(gridExtra)
+library(cowplot)
+library(scater)
+library(ggbeeswarm)
+library(ggpubr)
+
+```
+
+## Load
+
+### Code
+
+```{r load_code, message = FALSE}
+
+source(file = "../../code/filepath.R")
+source(file = "../../code/colors.R")
+
+```
+
+### Objects
+
+```{r}
+
+cpi_merged_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_cpi_pca"))
+
+species <- "mmus"
+
+```
+
+# Plots
+
+## A
+
+PCA dimensions 1 and 2
+
+```{r}
+
+plot_a <- ggplot(cpi_merged_pca$PCA[1:(nrow(cpi_merged_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     colour = cpi_merged_pca$Celltypes$Age))+
+  geom_point(size = 1.5)
+
+plot_a
+
+```
+
+## B
+
+PCA of emitters
+
+```{r}
+
+plot_b <- ggplot(cpi_merged_pca$PCA[1:(nrow(cpi_merged_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     colour = cpi_merged_pca$Celltypes$emitter))+
+  geom_point(size = 1.5)
+
+plot_b
+
+```
+
+# C 
+
+PCA of receivers
+
+```{r}
+
+plot_c <- ggplot(cpi_merged_pca$PCA[1:(nrow(cpi_merged_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     colour = cpi_merged_pca$Celltypes$receiver))+
+  geom_point(size = 1.5)
+
+plot_c
+
+```
+
+## D
+
+Schematic of euclidian distances
+
+## E
+
+Direct EDs
+
+Calculate euclidian distances first
+
+```{r}
+
+#scaling (and rename for convenience)
+cpi_both_scaled <- scale(t(cpi_merged_pca$Score))
+
+#euclidian distances
+cpi_both_dist <- dist(cpi_both_scaled, method = 'euclidean')
+
+# make a df for convenience
+cpi_both_dist_mat <- as.matrix(cpi_both_dist)
+cpi_both_dist_df <- as.data.frame(cpi_both_dist_mat)
+
+```
+
+Get the direct euclidian distances between ctps from young and ctps from old.
+
+```{r}
+
+dist_oy <- cpi_both_dist_df[grep("yng", rownames(cpi_both_dist_df)), 
+                         grep("old", colnames(cpi_both_dist_df))]
+
+dist_oy <- rownames_to_column(dist_oy, var = "ct_pair_yng")
+
+dist_oy_direct <- dist_oy %>%
+  pivot_longer(cols = c(2:ncol(dist_oy)),
+               names_to = "ct_pair_old",
+               names_ptypes = list("ct_pair_old" = character()),
+               values_to = "distance",
+               values_ptypes = list("euclidian_distance" = numeric())
+  )
+
+dist_oy_direct$ct_pair_yng <- gsub(paste0("_", species, "_", "yng"), "", dist_oy_direct$ct_pair_yng)
+dist_oy_direct$ct_pair_old <- gsub(paste0("_", species, "_", "old"), "", dist_oy_direct$ct_pair_old)
+
+
+dist_oy_direct$emitter_old <- gsub("[&][[:print:]]+", "", dist_oy_direct$ct_pair_old)
+dist_oy_direct$receiver_old <- gsub("[[:print:]]+[&]", "", dist_oy_direct$ct_pair_old)
+
+dist_oy_direct$emitter_yng <- gsub("[&][[:print:]]+", "", dist_oy_direct$ct_pair_yng)
+dist_oy_direct$receiver_yng <- gsub("[[:print:]]+[&]", "", dist_oy_direct$ct_pair_yng)
+
+dist_oy_direct$emitter_old <- factor(dist_oy_direct$emitter_old,
+                                levels = names(col_emi_red))
+dist_oy_direct$emitter_yng <- factor(dist_oy_direct$emitter_yng,
+                                levels = names(col_emi_red))
+
+dist_oy_direct$receiver_old <- factor(dist_oy_direct$receiver_old,
+                                levels = names(col_rec_red))
+dist_oy_direct$receiver_yng <- factor(dist_oy_direct$receiver_yng,
+                                levels = names(col_rec_red))
+
+dist_oy_direct_direct <- dist_oy_direct[dist_oy_direct$ct_pair_yng == dist_oy_direct$ct_pair_old,]
+
+```
+
+```{r}
+
+plot_e1 <- ggplot(dist_oy_direct_direct, 
+                  aes(x = emitter_old, y = distance, color = emitter_old))+
+  geom_quasirandom()
+  
+
+plot_e2 <- ggplot(dist_oy_direct_direct,
+                  aes(x = receiver_old, y = distance, color = receiver_old))+
+  geom_quasirandom()
+
+plot_e1
+plot_e2
+
+```
+
+## F
+
+Schematic of variability change.
+
+## G
+
+Euclidian distances within age groups.
+
+Get all distances within young, then all distances within old. 
+Then substract complete yng from complete old.
+
+```{r}
+
+cpi_both_dist_df_old <- cpi_both_dist_df[
+  grep("old", colnames(cpi_both_dist_df)),
+  grep("old", rownames(cpi_both_dist_df))]
+
+cpi_both_dist_df_old <- cpi_both_dist_df_old[
+  order(rownames(cpi_both_dist_df_old)),order(colnames(cpi_both_dist_df_old))]
+
+cpi_both_dist_df_yng <- cpi_both_dist_df[
+  grep("yng", colnames(cpi_both_dist_df)),
+  grep("yng", rownames(cpi_both_dist_df))]
+
+cpi_both_dist_df_yng <- cpi_both_dist_df_yng[
+  order(rownames(cpi_both_dist_df_yng)),order(colnames(cpi_both_dist_df_yng))]
+
+dist_df <- cpi_both_dist_df_old - cpi_both_dist_df_yng
+dist_df <- dist_df[order(rownames(dist_df)),order(colnames(dist_df))]
+
+```
+
+```{r}
+
+# change rownames and colnames to actual cell type names
+rownames(dist_df) <- gsub(paste0("_", species, "_", "old"), "", rownames(dist_df))
+colnames(dist_df) <- gsub(paste0("_", species, "_", "old"), "", colnames(dist_df))
+
+
+dist_df <- rownames_to_column(dist_df, var = "ct_pair1")
+
+dist_df_long <- dist_df %>%
+  pivot_longer(cols = c(2:ncol(dist_df)),
+               names_to = "ct_pair2",
+               names_ptypes = list("ct_pair2" = character()),
+               values_to = "distance",
+               values_ptypes = list("euclidian_distance" = numeric())
+  )
+
+
+dist_df_long$emitter1 <- gsub("[&][[:print:]]+", "", dist_df_long$ct_pair1)
+dist_df_long$receiver1 <- gsub("[[:print:]]+[&]", "", dist_df_long$ct_pair1)
+
+dist_df_long$emitter2 <- gsub("[&][[:print:]]+", "", dist_df_long$ct_pair2)
+dist_df_long$receiver2 <- gsub("[[:print:]]+[&]", "", dist_df_long$ct_pair2)
+
+dist_df_long$emitter1 <- factor(dist_df_long$emitter1,
+                                levels = names(col_emi_red))
+dist_df_long$emitter2 <- factor(dist_df_long$emitter2,
+                                levels = names(col_emi_red))
+
+dist_df_long$receiver1 <- factor(dist_df_long$receiver1,
+                                levels = names(col_rec_red))
+dist_df_long$receiver2 <- factor(dist_df_long$receiver2,
+                                levels = names(col_rec_red))
+```
+
+Stay within cell types
+
+```{r}
+
+dist_df_long_emi <- dist_df_long[
+  dist_df_long$emitter1 == dist_df_long$emitter2,] 
+dist_df_long_emi <- dist_df_long_emi[duplicated(dist_df_long_emi$distance),]
+
+median_emi1_e <- dist_df_long_emi %>%
+  group_by(emitter1) %>%
+  summarise(median_val = median(distance))
+
+plot_g1 <- ggplot(dist_df_long_emi,
+                  aes(x = emitter1, y = distance, color = emitter1))+
+  geom_quasirandom(size = 0.4)+
+  geom_point(median_emi1_e, mapping = aes(y = median_val), color = "black", 
+             fill = "white",  shape = 22, size = 3, stroke = 1)
+
+dist_df_long_rec <- dist_df_long[
+  dist_df_long$receiver1 == dist_df_long$receiver2,] 
+dist_df_long_rec <- dist_df_long_rec[duplicated(dist_df_long_rec$distance),]
+
+
+median_rec1_e <- dist_df_long_rec %>%
+  group_by(receiver1) %>%
+  summarise(median_val = median(distance))
+  
+
+plot_g2 <- ggplot(dist_df_long_rec, 
+                  aes(x = receiver1, y = distance, color = receiver1))+
+  geom_quasirandom(size = 0.4)+
+  geom_point(median_rec1_e, mapping = aes(y = median_val), color = "black",
+             fill = "white",  shape = 22, size = 3, stroke = 1)
+
+
+plot_g1
+plot_g2
+
+median(dist_df_long_emi$distance)
+median(dist_df_long_rec$distance)
+
+```
+
+# Uniform formatting
+
+```{r}
+
+plot_A <- plot_a+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  ylab(paste("PC2 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("PC1 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Age", values = col_age)+
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank())
+
+plot_a_legend <- ggplot(cpi_merged_pca$PCA[1:(nrow(cpi_merged_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     colour = cpi_merged_pca$Celltypes$Age))+
+  geom_point(size = 2.5)+
+    # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+ ylab(paste("PC2 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("PC1 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Age", values = col_age)
+
+legend_a <- get_legend(plot_a_legend)
+
+plot_A
+
+```
+
+```{r}
+
+plot_B <- plot_b+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  ylab(paste("PC2 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("PC1 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Emitters", values = col_emi_red)+
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank())
+
+
+plot_b_legend <- ggplot(cpi_merged_pca$PCA[1:(nrow(cpi_merged_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     colour = cpi_merged_pca$Celltypes$emitter))+
+  geom_point(size = 2.5)+
+    # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  ylab(paste("PC2 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("PC1 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Emitters", values = col_emi_red)
+
+legend_b <- get_legend(plot_b_legend)
+
+plot_B
+
+```
+
+```{r}
+
+plot_C <- plot_c+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  ylab(paste("PC2 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("PC1 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Receivers", values = col_rec_red)+
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank())
+
+
+plot_c_legend <- ggplot(cpi_merged_pca$PCA[1:(nrow(cpi_merged_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     colour = cpi_merged_pca$Celltypes$receiver))+
+  geom_point(size = 2.5)+
+    # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  ylab(paste("PC2 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("PC1 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_manual("Receivers", values = col_rec_red)
+
+legend_c <- get_legend(plot_c_legend)
+
+plot_C
+
+```
+
+```{r}
+
+plot_E1 <- plot_e1+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_color_manual("Emitters", values = col_emi_red)+
+  xlab("CTPs (summarised)")+
+  ylab(expression(atop("Direct EDs between",
+                       paste("old and young CTPs"))))+
+  ylim(limits = c(0, 125))
+
+plot_E1
+
+```
+
+```{r}
+
+plot_E2 <- plot_e2+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_color_manual("Receivers", values = col_rec_red)+
+  xlab("CTPs (summarised)")+
+  ylab(expression(atop("Direct EDs between",
+                       paste("old and young CTPs"))))+
+  ylim(limits = c(0, 125))
+
+plot_E2
+
+```
+
+```{r}
+
+plot_G1 <- plot_g1+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_color_manual("Emitters", values = col_emi_red)+
+  xlab("CTPs (summarised)")+
+  ylab(expression(atop("EDs within old interactomes -",
+                       paste("EDs within young interactomes"))))+
+  ylim(limits = c(-40, 75))
+
+plot_G1
+
+```
+
+```{r}
+
+plot_G2 <- plot_g2+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_color_manual("Receivers", values = col_rec_red)+
+  xlab("CTPs (summarised)")+
+  ylab(expression(atop("EDs within old interactomes -",
+                       paste("EDs within young interactomes"))))+
+  ylim(limits = c(-40, 75))
+
+plot_G2
+
+```
+
+# Assemble
+
+```{r}
+
+figure_5_abc <- ggarrange(
+  
+   ncol = 6,
+    widths = c(3.9, 1, 3.9, 2, 3.9, 2.45) ,
+  
+  plot_A+theme(legend.position = "none"),
+  legend_a,
+  plot_B+theme(legend.position = "none"),
+  legend_b,
+  plot_C+theme(legend.position = "none"),
+  legend_c
+  
+)
+
+figure_5_abc
+
+ggsave("images/figure_5_abc.png",
+  figure_5_abc,
+  width = 17*0.787402,
+  height = 5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+```{r}
+
+figure_5_e <- ggarrange(
+  
+  plot_E1+theme(legend.position = "none")+
+    ggtitle("Emitters"),
+  plot_E2+theme(legend.position = "none")+
+    ggtitle("Receivers")
+ 
+)
+
+figure_5_e
+
+
+ggsave("images/figure_5_e.png",
+  figure_5_e,
+  width = 9*0.787402,
+  height = 6*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+```{r}
+
+figure_5_g <- ggarrange(
+  
+  plot_G1+theme(legend.position = "none")+
+    ggtitle("Emitters"),
+  plot_G2+theme(legend.position = "none")+
+    ggtitle("Receivers")
+ 
+)
+
+figure_5_g
+
+ggsave("images/figure_5_g.png",
+  figure_5_g,
+  width = 9*0.787402,
+  height = 6*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```

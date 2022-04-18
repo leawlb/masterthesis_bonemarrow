@@ -1,0 +1,201 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Variability change with age.
+
+Related to figure results 5.
+Requires loaded figure results 5.
+
+```{r}
+
+dist_df_long_emi <- dist_df_long[
+  dist_df_long$emitter1 == dist_df_long$emitter2,] 
+dist_df_long_emi <- dist_df_long_emi[duplicated(dist_df_long_emi$distance),]
+
+median_emi1_e <- dist_df_long_emi %>%
+  group_by(emitter1) %>%
+  summarise(median_val = median(distance))
+
+plot_a1 <- ggplot(dist_df_long_emi,
+                  aes(x = emitter1, y = distance, color = receiver1))+
+  geom_quasirandom(size = 0.7)+
+  geom_point(median_emi1_e, mapping = aes(y = median_val), color = "black", 
+             fill = "white",  shape = 22, size = 3, stroke = 1)
+
+dist_df_long_rec <- dist_df_long[
+  dist_df_long$receiver1 == dist_df_long$receiver2,] 
+dist_df_long_rec <- dist_df_long_rec[duplicated(dist_df_long_rec$distance),]
+
+plot_a2 <- ggplot(dist_df_long_emi,
+                  aes(x = emitter1, y = distance, color = receiver2))+
+  geom_quasirandom(size = 0.7)+
+  geom_point(median_emi1_e, mapping = aes(y = median_val), color = "black", 
+             fill = "white",  shape = 22, size = 3, stroke = 1)
+
+dist_df_long_rec <- dist_df_long[
+  dist_df_long$receiver1 == dist_df_long$receiver2,] 
+dist_df_long_rec <- dist_df_long_rec[duplicated(dist_df_long_rec$distance),]
+
+
+
+median_rec1_e <- dist_df_long_rec %>%
+  group_by(receiver1) %>%
+  summarise(median_val = median(distance))
+  
+
+plot_b1 <- ggplot(dist_df_long_rec, 
+                  aes(x = receiver1, y = distance, color = emitter1))+
+  geom_quasirandom(size = 0.7)+
+  geom_point(median_rec1_e, mapping = aes(y = median_val), color = "black",
+             fill = "white",  shape = 22, size = 3, stroke = 1)
+
+plot_b2 <- ggplot(dist_df_long_rec, 
+                  aes(x = receiver1, y = distance, color = emitter2))+
+  geom_quasirandom(size = 0.7)+
+  geom_point(median_rec1_e, mapping = aes(y = median_val), color = "black",
+             fill = "white",  shape = 22, size = 3, stroke = 1)
+
+plot_a1
+plot_a2
+plot_b1
+plot_b2
+
+```
+
+
+```{r}
+
+plot_A1 <- plot_a1+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_color_manual("Receivers", values = col_rec_red)+
+  xlab("CTPs (summarised by emitter)")+
+  ylab(expression(atop("EDs within old interactomes -",
+                       paste("EDs within young interactomes"))))+
+  ylim(limits = c(-40, 75))+
+  ggtitle("Receiver partners 1")
+
+plot_A1
+
+```
+
+```{r}
+
+plot_A2 <- plot_a2+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_color_manual("Receivers", values = col_rec_red)+
+  xlab("CTPs (summarised by emitter)")+
+  ylab(expression(atop("EDs within old interactomes -",
+                       paste("EDs within young interactomes"))))+
+  ylim(limits = c(-40, 75))+
+  ggtitle("Receiver partners 2")
+
+plot_A2
+
+```
+
+```{r}
+
+plot_B1 <- plot_b1+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_color_manual("Emitters", values = col_emi_red)+
+  xlab("CTPs (summarised by receiver)")+
+  ylab(expression(atop("EDs within old interactomes -",
+                       paste("EDs within young interactomes"))))+
+  ylim(limits = c(-40, 75))+
+  ggtitle("Emitter partners 1")
+
+plot_B1
+
+```
+
+```{r}
+
+plot_B2 <- plot_b2+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_color_manual("Emitters", values = col_emi_red)+
+  xlab("CTPs (summarised by receiver)")+
+  ylab(expression(atop("EDs within old interactomes -",
+                       paste("EDs within young interactomes"))))+
+  ylim(limits = c(-40, 75))+
+  ggtitle("Emitter partners 2")
+
+plot_B2
+
+```
+
+```{r}
+
+figure_s7_ab <- ggarrange(
+  
+  ncol = 4,
+  plot_A1+theme(legend.position = "none"),
+  plot_A2+theme(legend.position = "none"),
+  plot_B1+theme(legend.position = "none"),
+  plot_B2+theme(legend.position = "none")
+ 
+)
+
+figure_s7_ab
+
+ggsave("images/figure_s7_ab.png",
+  figure_s7_ab,
+  width = 17*0.787402,
+  height = 6*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+
+
+

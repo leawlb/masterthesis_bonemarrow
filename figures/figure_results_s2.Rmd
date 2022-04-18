@@ -1,0 +1,651 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+QC replicates.
+
+Related to figure results 1
+
+# Preparation
+
+## Libraries
+
+```{r libraries, message = FALSE}
+
+library(SingleCellExperiment)
+library(rlist)
+library(tidyverse)
+library(eulerr)
+library(gridExtra)
+library(cowplot)
+library(scater)
+library(ggbeeswarm)
+library(ggpubr)
+
+```
+
+## Load
+
+### Code
+
+```{r load_code, message = FALSE}
+
+source(file = "../../code/filepath.R")
+source(file = "../../code/colors.R")
+source(file = "../../interactome/functions/cpi_functions_calculation.R")
+
+```
+
+### Objects
+
+CPI
+
+```{r}
+
+mmus_cpi_yng_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng_cpi_pca"))
+
+mmus_cpi_old_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old_cpi_pca"))
+
+
+mmus_cpi_yng1_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng1_cpi_pca"))
+
+mmus_cpi_yng2_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng2_cpi_pca"))
+
+mmus_cpi_yng3_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng3_cpi_pca"))
+
+
+mmus_cpi_old2_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old2_cpi_pca"))
+
+mmus_cpi_old3_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old3_cpi_pca"))
+
+```
+
+```{r}
+
+ctpints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctpints"))
+ctints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctints"))
+nrlrs_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nrlrs"))
+
+ctpints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctpints"))
+ctints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctints"))
+nrlrs_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nrlrs"))
+
+# young 
+
+ctpints_yng1 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng1_cpi_ctpints"))
+ctints_yng1 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng1_cpi_ctints"))
+nrlrs_yng1 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng1_cpi_nrlrs"))
+
+ctpints_yng2 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng2_cpi_ctpints"))
+ctints_yng2 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng2_cpi_ctints"))
+nrlrs_yng2 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng2_cpi_nrlrs"))
+
+ctpints_yng3 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng3_cpi_ctpints"))
+ctints_yng3 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng3_cpi_ctints"))
+nrlrs_yng3 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng3_cpi_nrlrs"))
+
+
+# old
+ctpints_old2 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old2_cpi_ctpints"))
+ctints_old2 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old2_cpi_ctints"))
+nrlrs_old2 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old2_cpi_nrlrs"))
+
+ctpints_old3 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old3_cpi_ctpints"))
+ctints_old3 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old3_cpi_ctints"))
+nrlrs_old3 <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old3_cpi_nrlrs"))
+
+```
+
+```{r}
+
+nrlrs_yng$condition <- "all"
+nrlrs_yng1$condition <- "mmus_young1"
+nrlrs_yng2$condition <- "mmus_young2"
+nrlrs_yng3$condition <- "mmus_young3"
+
+nrlrs_old$condition <- "all"
+nrlrs_old2$condition <- "mmus_old2"
+nrlrs_old3$condition <- "mmus_old3"
+
+nrlrs_yng_all <- rbind(nrlrs_yng, nrlrs_yng1, nrlrs_yng2, nrlrs_yng3)
+nrlrs_old_all  <- rbind(nrlrs_old, nrlrs_old2, nrlrs_old3)
+
+nrlrs_yng_all$condition <- factor(nrlrs_yng_all$condition, levels = c(
+  "all",
+  "mmus_young1", 
+  "mmus_young2",
+  "mmus_young3"
+))
+
+nrlrs_old_all$condition <- factor(nrlrs_old_all$condition, levels = c(
+  "all",
+  "mmus_old2",
+  "mmus_old3"
+))
+
+
+
+```
+
+```{r}
+
+ctpints_yng[[1]]$condition <- "all"
+ctpints_yng1[[1]]$condition <- "mmus_young1"
+ctpints_yng2[[1]]$condition <- "mmus_young2"
+ctpints_yng3[[1]]$condition <- "mmus_young3"
+
+ctpints_old[[1]]$condition <- "all"
+ctpints_old2[[1]]$condition <- "mmus_old2"
+ctpints_old3[[1]]$condition <- "mmus_old3"
+
+ctpints_yng_all <- rbind(ctpints_yng[[1]], ctpints_yng1[[1]], ctpints_yng2[[1]], ctpints_yng3[[1]])
+ctpints_old_all <- rbind(ctpints_old[[1]], ctpints_old2[[1]], ctpints_old3[[1]])
+
+ctpints_yng_all$condition <- factor(ctpints_yng_all$condition, levels = c(
+  "all",
+  "mmus_young1", 
+  "mmus_young2",
+  "mmus_young3"
+))
+
+ctpints_old_all$condition <- factor(ctpints_old_all$condition, levels = c(
+  "all",
+  "mmus_old2",
+  "mmus_old3"
+))
+
+```
+
+## A&C
+
+```{r}
+
+plot_a <-  ggplot(nrlrs_yng_all, aes(x = condition, y = nr_lrs))+
+  geom_boxplot()+
+   # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  theme(axis.text.x = element_text(angle = 90))+
+  theme(strip.text.x = element_text(size = 10, face = "bold", angle = 90))+
+  ylab("Number of ligands/receptors per cell type")+
+  xlab("Sample")+
+  ylim(limits = c(0, 200))
+
+plot_c <-  ggplot(nrlrs_old_all, aes(x = condition, y = nr_lrs))+
+  geom_boxplot(color = col_age[[2]])+
+   # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  theme(axis.text.x = element_text(angle = 90))+
+  theme(strip.text.x = element_text(size = 10, face = "bold", angle = 90))+
+  ylab("Number of ligands/receptors per cell type")+
+  xlab("Sample")+
+  ylim(limits = c(0, 200))
+
+plot_a
+plot_c
+
+```
+
+```{r}
+
+plot_b1 <-  ggplot(ctpints_yng_all, aes(x = condition, y = nr_ints))+
+  geom_boxplot()+
+  geom_quasirandom(aes(color = emitter), size = 0.8)+
+  scale_color_manual("Emitters", values = col_emi_red)+
+  # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  theme(axis.text.x = element_text(angle = 90))+
+  theme(strip.text.x = element_text(size = 11, face = "bold", angle = 90))+
+  ylab("Number of interactions/CTP")+
+  xlab("Sample")+
+  ylim(limits = c(0, 300))
+
+plot_b2 <-  ggplot(ctpints_yng_all, aes(x = condition, y = nr_ints))+
+  geom_boxplot()+
+  geom_quasirandom(aes(color = receiver), size = 0.8)+
+  scale_color_manual("Receivers", values = col_rec_red)+
+  # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  theme(axis.text.x = element_text(angle = 90))+
+  theme(strip.text.x = element_text(size = 11, face = "bold", angle = 90))+
+  ylab("Number of interactions/CTP")+
+  xlab("Sample")+
+  ylim(limits = c(0, 300))
+
+plot_d1 <-  ggplot(ctpints_old_all, aes(x = condition, y = nr_ints))+
+  geom_boxplot(color = col_age[[2]])+
+  geom_quasirandom(aes(color = emitter), size = 0.8)+
+  scale_color_manual("Emitters", values = col_emi_red)+
+   # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  theme(axis.text.x = element_text(angle = 90))+
+  theme(strip.text.x = element_text(size = 10, face = "bold", angle = 90))+
+  ylab("Number of interactions/CTP")+
+  xlab("Sample")+
+  ylim(limits = c(0, 300))
+
+plot_d2 <-  ggplot(ctpints_old_all, aes(x = condition, y = nr_ints))+
+  geom_boxplot(color = col_age[[2]])+
+  geom_quasirandom(aes(color = receiver), size = 0.8)+
+  scale_color_manual("Receivers", values = col_rec_red)+
+  # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  theme(axis.text.x = element_text(angle = 90))+
+  theme(strip.text.x = element_text(size = 11, face = "bold", angle = 90))+
+  ylab("Number of ligands/receptors per cell type")+
+  xlab("Sample")+
+  ylim(limits = c(0, 300))
+
+plot_b1
+plot_b2
+plot_d1
+plot_d2
+
+```
+
+## B
+
+```{r}
+
+mmus_cpi_yng_pca$Celltypes$Age <- "young"
+mmus_cpi_yng1_pca$Celltypes$Age <- "young"
+mmus_cpi_yng2_pca$Celltypes$Age <- "young"
+mmus_cpi_yng3_pca$Celltypes$Age <- "young"
+
+mmus_cpi_old_pca$Celltypes$Age <- "old"
+mmus_cpi_old2_pca$Celltypes$Age <- "old"
+mmus_cpi_old3_pca$Celltypes$Age <- "old"
+
+```
+
+
+```{r}
+
+plot_e1 <- ggplot(mmus_cpi_yng_pca$PCA[1:(nrow(mmus_cpi_yng_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_yng_pca$Celltypes$Age))+
+  geom_point(size = 1.5, alpha = 1)+
+ # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  scale_color_manual("Age", values = col_age)+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_yng_pca$PCA[nrow(mmus_cpi_yng_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_yng_pca$PCA[nrow(mmus_cpi_yng_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  ggtitle("all")
+
+plot_e2 <- ggplot(mmus_cpi_yng1_pca$PCA[1:(nrow(mmus_cpi_yng1_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_yng1_pca$Celltypes$Age))+
+  geom_point(size = 1.5, alpha = 1)+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    scale_color_manual("Age", values = col_age)+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_yng1_pca$PCA[nrow(mmus_cpi_yng1_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_yng1_pca$PCA[nrow(mmus_cpi_yng1_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  ggtitle("mmus_young1")
+
+plot_e3 <- ggplot(mmus_cpi_yng2_pca$PCA[1:(nrow(mmus_cpi_yng2_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_yng2_pca$Celltypes$Age))+
+  geom_point(size = 1.5, alpha = 1)+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+  scale_color_manual("Age", values = col_age)+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_yng2_pca$PCA[nrow(mmus_cpi_yng2_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_yng2_pca$PCA[nrow(mmus_cpi_yng2_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  ggtitle("mmus_young2")
+
+plot_e4 <- ggplot(mmus_cpi_yng3_pca$PCA[1:(nrow(mmus_cpi_yng3_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_yng3_pca$Celltypes$Age))+
+  geom_point(size = 1.5, alpha = 1)+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    scale_color_manual("Age", values = col_age)+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_yng3_pca$PCA[nrow(mmus_cpi_yng3_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_yng3_pca$PCA[nrow(mmus_cpi_yng3_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  ggtitle("mmus_young3")
+
+
+plot_e1
+plot_e2
+plot_e3
+plot_e4
+
+```
+
+
+## C
+
+```{r}
+
+plot_f1 <- ggplot(mmus_cpi_old_pca$PCA[1:(nrow(mmus_cpi_old_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_old_pca$Celltypes$Age))+
+  geom_point(size = 1.5, alpha = 1)+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    scale_color_manual("Age", values = col_age)+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_old_pca$PCA[nrow(mmus_cpi_old_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_old_pca$PCA[nrow(mmus_cpi_old_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  ggtitle("all")
+
+plot_f2 <- ggplot(mmus_cpi_old2_pca$PCA[1:(nrow(mmus_cpi_old2_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_old2_pca$Celltypes$Age))+
+  geom_point(size = 1.5, alpha = 1)+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+  scale_color_manual("Age", values = col_age)+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_old2_pca$PCA[nrow(mmus_cpi_old2_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_old2_pca$PCA[nrow(mmus_cpi_old2_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  ggtitle("mmus_old2")
+
+plot_f3 <- ggplot(mmus_cpi_old3_pca$PCA[1:(nrow(mmus_cpi_old3_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_old3_pca$Celltypes$Age))+
+  geom_point(size = 1.5, alpha = 1)+
+ #base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    scale_color_manual("Age", values = col_age)+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_old3_pca$PCA[nrow(mmus_cpi_old3_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_old3_pca$PCA[nrow(mmus_cpi_old3_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  ggtitle("mmus_old3")
+
+plot_f1
+plot_f2
+plot_f3
+
+```
+
+# Assemble
+
+```{r}
+
+figure_s2_ab <- ggarrange(
+  
+  ncol = 3,
+  
+  plot_a,
+  plot_b1+theme(legend.position = "none"),
+  plot_b2+theme(legend.position = "none")
+) 
+
+figure_s2_ab
+
+ggsave("images/figure_s2_ab.png",
+  figure_s2_ab,
+  width = 13*0.787402,
+  height = 6*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+
+```
+
+```{r}
+
+figure_s2_cd <- ggarrange(
+  
+  ncol = 3,
+  
+  plot_c,
+  plot_d1+theme(legend.position = "none"),
+  plot_d2+theme(legend.position = "none")
+) 
+
+figure_s2_cd
+
+ggsave("images/figure_s2_cd.png",
+  figure_s2_cd,
+  width = 13*0.787402,
+  height = 6*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+```{r}
+
+legend_2 <- get_legend(plot_b1)
+legend_3 <- get_legend(plot_b2)
+
+figure_s2_leg2 <- ggarrange(
+  
+  legend_2
+) 
+
+figure_s2_leg3 <- ggarrange(
+  
+  legend_3
+) 
+
+figure_s2_leg2
+figure_s2_leg3
+
+ggsave("images/figure_s2_leg3.png",
+  figure_s2_leg3,
+  width = 2.5*0.787402,
+  height = 4.5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+ggsave("images/figure_s2_leg2.png",
+  figure_s2_leg2,
+  width = 2.5*0.787402,
+  height = 4.5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+```{r}
+
+figure_s2_e <- ggarrange(
+  
+  ncol = 4,
+  
+  plot_e1+theme(legend.position = "none"),
+  plot_e2+theme(legend.position = "none"),
+  plot_e3+theme(legend.position = "none"),
+  plot_e4+theme(legend.position = "none")
+  
+)
+
+figure_s2_e
+
+ggsave("images/figure_s2_e.png",
+  figure_s2_e,
+  width = 16*0.787402,
+  height = 3.5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+```{r}
+
+figure_s2_f <- ggarrange(
+  
+  ncol = 3,
+  
+  plot_f1+theme(legend.position = "none"),
+  plot_f2+theme(legend.position = "none"),
+  plot_f3+theme(legend.position = "none")
+)
+
+figure_s2_f
+
+ggsave("images/figure_s2_f.png",
+  figure_s2_f,
+  width = 12*0.787402,
+  height = 3.5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+
+
+

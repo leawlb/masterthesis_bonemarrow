@@ -1,0 +1,881 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+"Age-specific ligand, receptor, and interaction sets"
+
+This script also requires cpi_interactions_yng_vs_old_mmus_cpi
+
+# Preparation
+
+## Libraries
+
+```{r libraries, message = FALSE}
+
+library(SingleCellExperiment)
+library(rlist)
+library(tidyverse)
+library(eulerr)
+library(gridExtra)
+library(cowplot)
+library(scater)
+library(ggbeeswarm)
+library(ggpubr)
+library(ggnewscale)
+library(ComplexUpset)
+
+```
+
+## Load
+
+### Code
+
+```{r load_code, message = FALSE}
+
+source(file = "../../code/filepath.R")
+source(file = "../../code/colors.R")
+source(file = "../../interactome/functions/cpi_functions_calculation.R")
+source(file = "../../interactome/functions/cpi_functions_analysis.R")
+
+```
+
+### Objects
+
+```{r}
+
+#  cpi objects
+cpi_yng <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng_cpi"))
+cpi_old <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old_cpi"))
+
+cpi_yng_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng_cpi_pca"))
+cpi_old_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old_cpi_pca"))
+
+cpi_merged_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_cpi_pca"))
+
+# corresponding metrics objects
+ctpints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctpints"))
+ctints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctints"))
+nrlrs_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nrlrs"))
+
+ctpints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctpints"))
+ctints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctints"))
+nrlrs_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nrlrs"))
+
+max_ctints <- 420
+max_ctpints <- 300
+```
+
+
+Merge overview dfs for direct comparion between age groups.
+
+```{r}
+
+ctpints_both <- rbind(ctpints_yng[[1]], ctpints_old[[1]])
+ctpints_both$age <- factor(ctpints_both$age, levels = c("young", "old"))
+ctpints_both$emitter <- factor(ctpints_both$emitter, 
+                               levels = names(col_emi_red))
+ctpints_both$receiver <- factor(ctpints_both$receiver, 
+                               levels = names(col_rec_red))
+```
+
+```{r}
+
+ctints_both <- rbind(ctints_yng[[1]], ctints_old[[1]])
+ctints_both$age <- factor(ctints_both$age, levels = c("young", "old"))
+ctints_both$celltypes <- factor(ctints_both$celltypes, 
+                                levels = names(col_cts_red))
+ctints_both$annotation <- factor(ctints_both$annotation,
+                                 levels = names(col_ann))
+```
+
+```{r}
+
+nrlrs_both <- rbind(nrlrs_yng, nrlrs_old)
+nrlrs_both$age <- factor(nrlrs_both$age, levels = c("young", "old"))
+nrlrs_both$celltypes <- factor(nrlrs_both$celltypes, 
+                               levels = names(col_cts_red))
+```
+
+
+# Figure Parts
+
+## A
+
+Overlap young old cell type level ligands
+
+For better convenience, skip uniform font size step here.
+
+```{r}
+
+ggdf1 <- sigmols_shared_young
+ggdf2 <- sigmols_shared_old
+
+ggdf1$sample <- unfactor(ggdf1$sample)
+ggdf2$sample <- unfactor(ggdf2$sample)
+
+ggdf1$sample[ggdf1$sample == "shared"] <- "conserved"
+ggdf2$sample[ggdf2$sample == "shared"] <- "conserved"
+
+ggdf1$sample <- factor(ggdf1$sample, levels = c(
+  "exclusively young", "exclusively old", "conserved"))
+ggdf2$sample <- factor(ggdf2$sample, levels = c(
+  "exclusively young", "exclusively old", "conserved"))
+
+legend_plot_a1 <- ggplot(ggdf1, 
+         aes(y = reorder(celltypes, order), x = value, fill = sample))+
+    geom_col(position = "stack")+
+    # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+    scale_fill_manual("", values = c("exclusively young" = col_age[[1]], 
+                                     "exclusively old" = col_age[[2]],
+                                    conserved = "orange"))
+
+legend_a1 <- get_legend(legend_plot_a1)
+    
+plot_a1 <- ggarrange(
+  
+  ncol = 3,
+  widths = c(1, 1.65),
+
+  ggplot(ggdf1[ggdf1$annotation == "emitter",], 
+         aes(y = reorder(celltypes, order), x = -value, fill = sample))+
+    geom_col(position = "stack")+
+    # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+    scale_fill_manual("", values = c("exclusively young" = col_age[[1]], 
+                                     "exclusively old" = col_age[[2]],
+                                    conserved = "orange"))+
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(-220, 0),
+                       breaks = c(-200, -100, 0),
+                       labels = c(200, 100, 0))+
+    ylab("")+
+     xlab(expression(atop("Ligands/",
+                       paste("emitter"))))+
+    theme(legend.position = "none"),
+ 
+  
+   ggplot(ggdf2[ggdf2$annotation == "emitter",], 
+         aes(y = reorder(celltypes, order), x = value, fill = sample))+
+    geom_col(position = "stack")+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+    scale_fill_manual("", values = c("exclusively young" = col_age[[1]], 
+                                     "exclusively old" = col_age[[2]],
+                                    conserved = "orange"))+
+    theme(axis.text.y = element_text(size = 11, hjust = 0.5,
+                                     margin = margin(0, -6, 0, -9, unit = "pt")),
+          axis.title.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(0, 220),
+                       breaks = c(0, 100, 200),
+                       labels = c(0, 100, 200))+
+    ylab("Cell type pairs")+
+    xlab(expression(atop("Ligands/",
+                       paste("emitter"))))+
+    theme(legend.position = "none")
+)
+
+plot_a1
+
+```
+
+Overlap young old cell type level receptors
+
+Requires loaded cpi_interactions_yng_vs_old
+
+```{r}
+    
+plot_a2 <- ggarrange(
+  
+  ncol = 2,
+  widths = c(1, 1.75),
+
+  ggplot(ggdf1[ggdf1$annotation == "receiver",], 
+         aes(y = reorder(celltypes, order), x = -value, fill = sample))+
+    geom_col(position = "stack")+
+    # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+    scale_fill_manual("", values = c("exclusively young" = col_age[[1]], 
+                                     "exclusively old" = col_age[[2]],
+                                    conserved = "orange"))+
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(-220, 0),
+                       breaks = c(-200, -100, 0),
+                       labels = c(200, 100, 0))+
+    ylab("")+
+     xlab(expression(atop("Receptors/",
+                       paste("receiver"))))+
+    theme(legend.position = "none"),
+ 
+  
+   ggplot(ggdf2[ggdf2$annotation == "receiver",], 
+         aes(y = reorder(celltypes, order), x = value, fill = sample))+
+    geom_col(position = "stack")+
+    # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+    scale_fill_manual("", values = c("exclusively young" = col_age[[1]], 
+                                     "exclusively old" = col_age[[2]],
+                                    conserved = "orange"))+
+    theme(axis.text.y = element_text(size = 11, hjust = 0.5,
+                                     margin = margin(0, -8, 0, -9, unit = "pt")),
+          axis.title.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(0, 220),
+                       breaks = c(0, 100, 200),
+                       labels = c(0, 100, 200))+
+    ylab("Cell type pairs")+
+      xlab(expression(atop("Receptors/",
+                       paste("receiver"))))+
+    theme(legend.position = "none")
+  
+)
+
+plot_a2
+
+```
+
+## B 
+
+Percentage of conserved ligands/receptors.
+
+```{r}
+
+plot_b <- plot_emirec_unique
+plot_b
+
+median(sigmols_shared_age_long$unique_percent[
+  intersect(which(sigmols_shared_age_long$annotation == "Receivers"),
+            which(sigmols_shared_age_long$age == "old"))
+])
+
+sigmols_shared_age_long[sigmols_shared_age_long$celltypes == "Stromal fibros",]
+sigmols_shared_age_long[sigmols_shared_age_long$celltypes == "Dendritic-primed progs",]
+
+```
+
+## C
+
+Overlap interactions cell type level emitters
+
+```{r}
+
+ggdf3 <- ctints_shared_young
+ggdf4 <- ctints_shared_old
+
+ggdf3$sample <- unfactor(ggdf3$sample)
+ggdf4$sample <- unfactor(ggdf4$sample)
+
+ggdf3$sample[ggdf3$sample == "shared"] <- "conserved"
+ggdf4$sample[ggdf4$sample == "shared"] <- "conserved"
+
+ggdf3$sample <- factor(ggdf3$sample, levels = c(
+  "exclusively young", "exclusively old", "conserved"))
+ggdf4$sample <- factor(ggdf4$sample, levels = c(
+  "exclusively young", "exclusively old", "conserved"))
+
+
+plot_c1 <- ggarrange(
+  
+  ncol = 2,
+  widths = c(1, 1.5),
+
+  ggplot(ggdf3[ggdf3$annotation == "emitter",], 
+         aes(y = reorder(celltypes, order), x = -value, fill = sample))+
+    geom_col(position = "stack")+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+    scale_fill_manual("", values = c("exclusively young" = col_age[[1]], 
+                                     "exclusively old" = col_age[[2]],
+                                    conserved = "orange"))+
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45),
+          legend.position = "none")+
+    scale_x_continuous(limits = c(-max_ctints, 0),
+                       breaks = c(-400, -200, 0),
+                       labels = c(0, 200, 400))+
+    ylab("")+
+   xlab(expression(atop("Number of LRIs/",
+                       paste("emitter")))),
+ 
+  
+   ggplot(ggdf4[ggdf4$annotation == "emitter",], 
+         aes(y = reorder(celltypes, order), x = value, fill = sample))+
+    geom_col(position = "stack")+
+    # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+    scale_fill_manual("", values = c("exclusively young" = col_age[[1]], 
+                                     "exclusively old" = col_age[[2]],
+                                    conserved = "orange"))+
+    theme(axis.text.y = element_text(size = 11, hjust = 0.5,
+                                     margin = margin(0, -6, 0, -9, unit = "pt")),
+          axis.title.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45),
+          legend.position = "none")+
+    scale_x_continuous(limits = c(0, max_ctints),
+                       breaks = c(0, 200, 400),
+                       labels = c(0, 200, 400))+
+     xlab(expression(atop("Number of LRIs/",
+                       paste("emitter"))))
+)
+
+plot_c1
+
+```
+
+Overlap interactions cell type level receivers
+
+```{r}
+
+plot_c2 <- ggarrange(
+  
+  ncol = 3,
+  widths = c(1, 1.65),
+
+  ggplot(ggdf3[ggdf3$annotation == "receiver",], 
+         aes(y = reorder(celltypes, order), x = -value, fill = sample))+
+    geom_col(position = "stack")+
+    # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+    scale_fill_manual("", values = c("exclusively young" = col_age[[1]], 
+                                     "exclusively old" = col_age[[2]],
+                                    conserved = "orange"))+
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(-max_ctints, 0),
+                       breaks = c(-400, -200, 0),
+                       labels = c(400, 200, 0))+
+    ylab("")+
+    xlab(expression(atop("Number of LRIs/",
+                       paste("receiver"))))+
+    theme(legend.position = "none"),
+ 
+  
+   ggplot(ggdf4[ggdf4$annotation == "receiver",], 
+         aes(y = reorder(celltypes, order), x = value, fill = sample))+
+    geom_col(position = "stack")+
+    # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+    scale_fill_manual("", values = c("exclusively young" = col_age[[1]], 
+                                     "exclusively old" = col_age[[2]],
+                                    conserved = "orange"))+
+    theme(axis.text.y = element_text(size = 11, hjust = 0.5,
+                                     margin = margin(0, -8, 0, -9, unit = "pt")),
+          axis.title.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(0, max_ctints),
+                       breaks = c(0, 200, 400),
+                       labels = c(0, 200, 400))+
+    ylab("Cell type pairs")+
+    xlab(expression(atop("Number of LRIs/",
+                       paste("receiver"))))+
+    theme(legend.position = "none")
+)
+
+plot_c2
+
+```
+
+## D 
+
+Uniquely young and old ints/cell type
+
+```{r}
+
+plot_d <- plot_emirec_unique_ints
+plot_d
+
+ctints_shared_age_long[ctints_shared_age_long$celltypes == "Stromal fibros",]
+ctints_shared_age_long[ctints_shared_age_long$celltypes == "Dendritic-primed progs",]
+
+
+median(ctints_shared_age_long$unique_percent[
+  intersect(which(ctints_shared_age_long$annotation == "Emitters"),
+            which(ctints_shared_age_long$age == "old"))
+])
+
+```
+
+## E
+
+OVerlap young vs old cell type pair level
+
+```{r}
+
+plot_e1 <- ggarrange(
+  
+  ncol = 2,
+
+  ggplot(ctpints_shared_young, 
+         aes(y = reorder(ct_pair, order), x = -value, fill = sample))+
+    geom_col(position = "stack")+
+    # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+    scale_fill_manual("", values = c("exclusively young" = col_age[[1]], 
+                                     "exclusively old" = col_age[[2]],
+                                    shared = "orange"))+
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(-max_ctpints, 0),
+                       breaks = c(-max_ctpints, (-max_ctpints* 0.5), 0),
+                       labels = c(max_ctpints, (max_ctpints* 0.5), 0))+
+    ylab("")+
+     xlab(expression(atop("Number of",
+                       paste("LRIs/CTP"))))+
+    theme(legend.position = "none"),
+ 
+  
+   ggplot(ctpints_shared_old, 
+         aes(y = reorder(ct_pair, order), x = value, fill = sample))+
+    geom_col(position = "stack")+
+    # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+    scale_fill_manual("", values = c("old" = col_age[[2]], 
+                                     "young" = col_age[[1]], 
+                                    shared = "orange"))+
+    theme(axis.text.y = element_blank(),
+          axis.ticks.y = element_blank(),
+          axis.line.y = element_blank(),
+          plot.title = element_text(hjust = 0.45))+
+    scale_x_continuous(limits = c(0, max_ctpints),
+                       breaks = c(0, (max_ctpints*0.5), max_ctpints),
+                       labels = c(0, (max_ctpints*0.5), max_ctpints))+
+    ylab("Cell type pairs")+
+     xlab(expression(atop("Number of",
+                       paste("LRIs/CTP"))))+
+    theme(legend.position = "none")
+    
+)
+
+plot_e1
+
+```
+
+## F
+
+Percent of unique interactions for each ct
+
+```{r}
+
+ctpints_shared_age$emitter <- factor(ctpints_shared_age$emitter,
+                                      levels = names(col_emi_red))
+
+ctpints_shared_age_long <- ctpints_shared_age %>%
+  pivot_longer(col = c(10,11), values_to = "perc_unique", names_to = "age")
+
+
+ctpints_shared_age_long$age[
+  ctpints_shared_age_long$age == "perc_unique_old"] <- "old"
+ctpints_shared_age_long$age[
+  ctpints_shared_age_long$age == "perc_unique_yng"] <- "young"
+ctpints_shared_age_long$age <- factor(ctpints_shared_age_long$age,
+                                      levels = c("young", "old"))
+
+plot_f1 <- ggplot(ctpints_shared_age_long, 
+                  aes(x = age, color = age, y = perc_unique))+
+  geom_boxplot()+
+  facet_grid(cols = vars(emitter), switch = "x")
+
+plot_f1
+
+```
+
+```{r}
+
+ctpints_shared_age_long$receiver <- factor(ctpints_shared_age_long$receiver,
+                                      levels = names(col_rec_red))
+
+plot_f2 <- ggplot(ctpints_shared_age_long, aes(x = age, color = age, y = perc_unique))+
+  geom_boxplot()+
+  facet_grid(cols = vars(receiver), switch = "x")
+
+plot_f2
+
+```
+
+# Uniform Formatting
+
+
+```{r}
+
+plot_B <- plot_b +
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+  scale_color_manual("Age", values = col_age)+
+  ylim(limits = c(0, 100))+
+ylab(expression(atop("Unique ligands or receptors",
+                       paste("[% of total ligands or receptors]"))))+
+  theme(axis.title.x = element_blank())+
+  stat_compare_means(method = "anova",
+                     label = "p.signif",
+                     inherit.aes = TRUE,
+                     label.y = 47, size = 3.5)
+
+plot_B
+
+```
+
+```{r}
+
+plot_D <- plot_d+
+ #  base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+  scale_color_manual("Age", values = col_age)+
+  ylim(limits = c(0, 100))+
+ylab(expression(atop("Unique LRIs",
+                       paste("[% of total LRIs/cell type]"))))+
+  theme(axis.title.x = element_blank())+
+  stat_compare_means(method = "anova",
+                     label = "p.signif",
+                     inherit.aes = TRUE,
+                     label.y = 47, size = 3.5)
+
+plot_D
+
+```
+
+
+```{r}
+
+plot_E <- plot_e1
+
+plot_E
+
+```
+
+```{r}
+
+
+plot_F1 <- plot_f1+
+ #  base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+  scale_color_manual("Age", values = col_age)+
+ylab(expression(atop("Unique LRIs",
+                       paste("[% of total LRIs/CTP]"))))+
+  xlab("CTPs (summarized)")+
+  ylim(limits = c(0, 100))+
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank(),
+        strip.background = element_blank(),
+        strip.text.x = element_text(angle = 90, size = 11),
+        strip.placement = "outside")
+
+plot_F1
+
+legend_age <- get_legend(plot_F1)
+
+```
+
+```{r}
+
+plot_F2 <- plot_f2+
+ #  base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # individual additions
+  scale_color_manual("Age", values = col_age)+
+ ylab(expression(atop("Unique LRIs",
+                       paste("[% of total LRIs/CTP]"))))+
+  xlab("CTPs (summarized)")+
+  ylim(limits = c(0, 100))+
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        axis.title.x = element_blank(),
+        strip.background = element_blank(),
+        strip.text.x = element_text(angle = 90, size = 11),
+        strip.placement = "outside")
+
+plot_F2
+
+```
+
+# Assemble
+
+```{r}
+
+plot_A1 <- annotate_figure(plot_a1,
+               top = text_grob("Emitters", face = "bold", size = 14,
+                               hjust = 1.5))
+
+plot_A2 <-annotate_figure(plot_a2,
+               top = text_grob("Receivers", face = "bold", size = 14,
+                               hjust = 0.4))
+
+plot_A1
+plot_A2
+
+
+ggsave("images/figure_4_a1.png",
+  plot_A1,
+  width = 7.5*0.787402,
+  height = 5.2*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+ggsave("images/figure_4_a2.png",
+  plot_A2,
+  width = 6*0.787402,
+  height = 5.2*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+figure_4_b <- ggarrange(
+  ncol = 1,
+  plot_B+theme(legend.position = "none"),
+  heights = c(3,1),
+  ggarrange(
+    legend_a1,
+    legend_age,
+      widths = c(3,2)
+  )
+)
+
+figure_4_b
+
+ggsave("images/figure_4_b.png",
+  figure_4_b,
+  width = 3.5*0.787402,
+  height = 5.2*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+```{r}
+
+plot_C1 <- annotate_figure(plot_c1,
+               top = text_grob("Emitters", face = "bold", size = 14,
+                               hjust = 0.3))
+
+plot_C2 <-annotate_figure(plot_c2,
+               top = text_grob("Receivers", face = "bold", size = 14,
+                               hjust = 1.25))
+
+plot_C1
+plot_C2
+
+
+ggsave("images/figure_4_c1.png",
+  plot_C1,
+  width = 5.5*0.787402,
+  height = 5.2*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+ggsave("images/figure_4_c2.png",
+  plot_C2,
+  width = 8*0.787402,
+  height = 5.2*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+figure_4_d <- ggarrange(
+  ncol = 1,
+  plot_D+theme(legend.position = "none"),
+  heights = c(3,1),
+  NULL
+  
+)
+
+figure_4_d
+
+ggsave("images/figure_4_d.png",
+  figure_4_d,
+  width = 3.5*0.787402,
+  height = 5.2*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+```{r}
+
+figure_4_ef <- ggarrange(
+  
+  ncol = 3,
+  widths = c(5, 2, 2),
+  plot_E,
+  plot_F1+theme(legend.position = "none"),
+  plot_F2+theme(legend.position = "none")
+)
+
+figure_4_ef
+
+ggsave("images/figure_4_ef.png",
+  figure_4_ef,
+  width = 17*0.787402,
+  height = 6.3*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```

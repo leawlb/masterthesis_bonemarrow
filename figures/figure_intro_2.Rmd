@@ -1,0 +1,101 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Big UMAP for introduction.
+
+## Libraries
+
+```{r libraries, message = FALSE}
+
+library(SingleCellExperiment)
+library(rlist)
+library(cowplot)
+library(scater)
+library(scran)
+library(ggpubr)
+
+```
+
+## Load
+
+### Code
+
+```{r load_code, message = FALSE}
+
+source(file = "../../code/filepath.R")
+source(file = "../../code/colors.R")
+
+```
+
+### Objects
+
+```{r}
+
+sce_all <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_SCE"))
+
+```
+
+# Figure Plots
+
+## A
+
+Will be schematic of experimental and pre-processing procedure
+
+## B
+
+BIG CELL TYPE UMAP
+
+```{r}
+
+col_cts_all_1 <- col_cts_all[names(col_cts_all) %in% unique(sce_all$Identity)]
+
+
+plot_a <- plotUMAP(sce_all,  colour_by = "Identity", point_size = 0.2, 
+                       point_alpha = 1)+
+  scale_color_manual("Cell type", values = col_cts_all_1)+
+  theme(legend.position = "none",
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_text(size = 9))
+
+plot_a
+
+
+
+plot_a_leg <- plotUMAP(sce_all,  colour_by = "Identity", point_size = 2.5, 
+                       point_alpha = 1)+
+  scale_color_manual("Cell type", values = col_cts_all_1, guide = guide_legend(ncol = 1))+
+  theme(legend.title = element_text(size = 9, face = "bold"),
+        legend.text = element_text(size = 8))+
+  guides(color=guide_legend(ncol=2))
+
+legend_a <- get_legend(plot_a_leg)
+
+
+figure_intro2_a <- ggarrange(
+  
+  ncol = 2,
+  widths = c(4, 2.2),
+  
+  plot_a,
+  legend_a
+  
+)
+
+figure_intro2_a
+
+ggsave("images/figure_intro2.png",
+  figure_intro2_a,
+  width = 10*0.787402,
+  height = 6*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```

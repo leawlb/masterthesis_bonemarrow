@@ -1,0 +1,1288 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+"I optimized scRNAseq data for this method"
+
+# Preparation
+
+## Libraries
+
+```{r libraries, message = FALSE}
+
+library(SingleCellExperiment)
+library(rlist)
+library(tidyverse)
+library(eulerr)
+library(gridExtra)
+library(cowplot)
+library(scater)
+library(ggbeeswarm)
+library(ggpubr)
+
+```
+
+## Load
+
+### Code
+
+```{r load_code, message = FALSE}
+
+source(file = "../../code/filepath.R")
+source(file = "../../code/colors.R")
+source(file = "../../interactome/functions/cpi_functions_calculation.R")
+
+```
+
+### Objects
+
+```{r}
+
+# merged and pre-processed SCE objects
+sce_yng <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_young_SCE_ds_ctrm"))
+sce_old <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_old_SCE_ds_ctrm"))
+
+sce_yng_raw <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_young_SCE"))
+sce_old_raw <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_old_SCE"))
+
+sce_all <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_SCE"))
+
+# corresponding cpi objects
+cpi_yng <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng_cpi"))
+cpi_old <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old_cpi"))
+
+cpi_yng_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng_cpi_pca"))
+cpi_old_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old_cpi_pca"))
+
+cpi_merged_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_cpi_pca"))
+
+# corresponding RAW cpi objects
+cpi_yng_raw <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng_cpi_raw_pca"))
+cpi_old_raw <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old_cpi_raw_pca"))
+
+cpi_merged_pca_raw <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_cpi_raw_pca"))
+
+
+# corresponding metrics objects
+ctpints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctpints"))
+ctints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctints"))
+nrlrs_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nrlrs"))
+
+ctpints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctpints"))
+ctints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctints"))
+nrlrs_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nrlrs"))
+
+# corresponding metrics objects RAW
+ctpints_yng_raw <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_raw_ctpints"))
+ctints_yng_raw <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_raw_ctints"))
+nrlrs_yng_raw <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_raw_nrlrs"))
+
+ctpints_old_raw <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_raw_ctpints"))
+ctints_old_raw <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_raw_ctints"))
+nrlrs_old_raw <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_raw_nrlrs"))
+
+# corresponding metrics objects NCT
+ctpints_yng_nct <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nct_ctpints"))
+ctints_yng_nct <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nct_ctints"))
+nrlrs_yng_nct <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nct_nrlrs"))
+
+ctpints_old_nct <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nct_ctpints"))
+ctints_old_nct <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nct_ctints"))
+nrlrs_old_nct <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nct_nrlrs"))
+
+
+```
+
+```{r}
+
+lrdb_part <- list.load(file = paste(
+  filepath_lv1, "data/databases/lrdb_part.rds", sep = ""))
+
+lrdb_comp <- list.load(file = paste(
+  filepath_lv1, "data/databases/lrdb_comp.rds", sep = ""))
+
+```
+
+# Figure Parts
+
+## A
+
+This will be a schematic.
+
+## B
+
+LRDB Sources Euler plot.
+
+```{r}
+
+area_rnamagnet <- length(which(lrdb_comp$sources$RNA.Magnet_row != "NA" &
+                                 lrdb_comp$sources$CellChatDB.mouse_row == "NA" &
+                                 lrdb_comp$sources$Mende.et.al_row == "NA"))
+
+area_ccdb <- length(which(lrdb_comp$sources$RNA.Magnet_row == "NA" &
+                                 lrdb_comp$sources$CellChatDB.mouse_row != "NA" &
+                                 lrdb_comp$sources$Mende.et.al_row == "NA"))
+
+area_mende <- length(which(lrdb_comp$sources$RNA.Magnet_row == "NA" &
+                                 lrdb_comp$sources$CellChatDB.mouse_row == "NA" &
+                                 lrdb_comp$sources$Mende.et.al_row != "NA"))
+
+overlap_rnamagnet_ccdb <- length(which(lrdb_comp$sources$RNA.Magnet_row != "NA" &
+                                 lrdb_comp$sources$CellChatDB.mouse_row != "NA" &
+                                 lrdb_comp$sources$Mende.et.al_row == "NA"))
+
+overlap_ccdb_mende <-length(which(lrdb_comp$sources$RNA.Magnet_row != "NA" &
+                                 lrdb_comp$sources$CellChatDB.mouse_row == "NA" &
+                                 lrdb_comp$sources$Mende.et.al_row != "NA"))
+
+overlap_rnamagnet_mende <- length(which(lrdb_comp$sources$RNA.Magnet_row == "NA" &
+                                 lrdb_comp$sources$CellChatDB.mouse_row != "NA" &
+                                 lrdb_comp$sources$Mende.et.al_row != "NA"))
+
+overlap_all <- length(which(lrdb_comp$sources$RNA.Magnet_row != "NA" &
+                              lrdb_comp$sources$CellChatDB.mouse_row != "NA" &
+                              lrdb_comp$sources$Mende.et.al_row != "NA" ))
+
+
+fit <- euler(c("A" = area_rnamagnet, 
+               "B" = area_ccdb, 
+               "C" = area_mende,
+               "A&B" = overlap_rnamagnet_ccdb,
+               "A&C" = overlap_ccdb_mende,
+               "B&C" = overlap_rnamagnet_mende,
+               "A&B&C" = overlap_all))
+
+plot_b <- plot(fit, 
+     labels = c("", "", ""),
+     fills = c("grey80", "orange", "white"),
+     quantities = list(type = "percent", cex = 1))
+
+grid.arrange(
+  grobs = plot_b[[5]]
+)
+
+plot_b
+
+```
+
+## C
+
+LRDB Interactions.
+
+```{r}
+
+# info from lrdb
+interactions_all <- as.data.frame(table(lrdb_comp$interactions$interaction_type))
+colnames(interactions_all)[1] <- "Interaction_type" 
+
+# info from yng and old cpis
+interactions_yng <- as.data.frame(table(cpi_yng$Interactions$interaction_type[
+  is.nan(rowMeans(cpi_yng$Score, na.rm = TRUE)) == FALSE]))
+interactions_old <- as.data.frame(table(cpi_old$Interactions$interaction_type[
+  is.nan(rowMeans(cpi_old$Score, na.rm = TRUE)) == FALSE]))
+
+interactions_all$mmus_young[match(interactions_yng$Var1, interactions_all[,1])] <- interactions_yng$Freq
+interactions_all$mmus_old[match(interactions_old$Var1, interactions_all[,1])] <- interactions_old$Freq
+
+
+colnames(interactions_all)[2] <- "LRDB"
+
+interactions_all <- pivot_longer(interactions_all, 
+                                 cols = c(2:4),
+                                 names_to = "Sample")
+
+interactions_all$Interaction_type <- factor(interactions_all$Interaction_type,
+                                            levels = names(col_itp))
+
+interactions_all$Sample[interactions_all$Sample == "mmus_young"] <- "young"
+interactions_all$Sample[interactions_all$Sample == "mmus_old"] <- "old"
+
+interactions_all$Sample <- factor(interactions_all$Sample,
+                                  levels = c("LRDB", "young", "old"))
+
+interactions_all$value[is.na(interactions_all$value)] <- 0
+
+plot_c <- ggplot(interactions_all,  aes(x = Sample,
+                              y = value,
+                              fill = Interaction_type))+
+  geom_col(position = "stack")+
+  ylab("Number of interactions")+
+  scale_fill_manual("LRI functional annotation", values = col_itp)
+  
+plot_c
+
+```
+
+# D
+
+UMAP with discarded cells.
+
+```{r}
+
+hem_cts <- c("LMPPs", "Small pre-BCs", "Large pre-BCs", "Pro-BCs",
+             "Mature B cells", "T cells", "NK cells", "Gran/Mono prog.",
+             "Monocyte prog.", "Neutrophil prog.", "Eo/Baso prog.",
+             "Monocytes", "Neutrophils", "Dendritic cells", "Ery/Mk prog.",
+             "Megakaryocyte prog.", "Erythrocyte prog.", "Erythroid",
+             "Baso/Eo/Mast prog.", "T cells/NK cells", "Monocyte-primed prog.",
+             "Dendritic-primed prog.", "LT-HSCs", "Common myeloid prog.",
+             "Gran/Mono prog."
+             )
+
+hem_pos <- intersect(which(sce_all$Fraction == "stromal"),
+                       which(sce_all$Identity %in% hem_cts))
+  
+sce_all$Discard <- rep("FALSE", length(ncol(sce_all)))
+sce_all$Discard[hem_pos] <- "TRUE"
+  
+# cell type vector of cell types to remove from all fractions
+remove_cts <- c("Schwann cells", "Mature B cells", "T cells/NK cells", 
+                "Pro-BCs", "Dendritic cells", "Monocytes", "Neutrophils", 
+                "Erythroid", "Small pre-BCs", "Large pre-BCs", 
+                "Immature B cells",  "Chondrocytes", "Myofibroblasts", 
+                "Gran/Mono prog.")
+
+remove_pos <- which(sce_all$Identity %in% remove_cts)
+sce_all$Discard[remove_pos] <- "TRUE"
+
+
+plot_d <- plotUMAP(sce_all,  colour_by = "Discard", point_size = 0.1, 
+                       point_alpha = 1)+
+  scale_color_manual("Removed cells", values = c("TRUE" = "orange", 
+                                                 "FALSE" = "grey20"))
+
+plot_d_leg <- plotUMAP(sce_all,  colour_by = "Identity", point_size = 2.5, 
+                       point_alpha = 1)+
+  scale_color_manual("Removed cells", values = c("TRUE" = "orange", 
+                                                 "FALSE" = "grey20"))
+
+plot_d
+
+length(sce_all$Discard)
+length(which(sce_all$Discard == TRUE))
+
+```
+
+## E und F
+
+Downsampling.
+
+```{r}
+
+qc_df_yng_df <- perCellQCMetrics(sce_yng, assay.type = "downsampled")
+qc_df_old_df <- perCellQCMetrics(sce_old, assay.type = "downsampled")
+
+qc_df_yng_raw_df <- perCellQCMetrics(sce_yng)
+qc_df_old_raw_df <- perCellQCMetrics(sce_old)
+
+qc_df_yng_df$Age <- sce_yng$Age
+qc_df_old_df$Age <- sce_old$Age
+qc_df_yng_raw_df$Age <- sce_yng$Age
+qc_df_old_raw_df$Age <- sce_old$Age
+
+qc_df_yng_df$Identity <- sce_yng$Identity
+qc_df_old_df$Identity <- sce_old$Identity
+qc_df_yng_raw_df$Identity <- sce_yng$Identity
+qc_df_old_raw_df$Identity <- sce_old$Identity
+
+qc_df_yng_df$condition <- "After"
+qc_df_old_df$condition <- "After"
+qc_df_yng_raw_df$condition <- "Before"
+qc_df_old_raw_df$condition <- "Before"
+
+qc_df_all_df <- rbind(qc_df_yng_df,
+                      qc_df_old_df,
+                      qc_df_yng_raw_df,
+                      qc_df_old_raw_df)
+
+qc_df_all_df$condition <- factor(qc_df_all_df$condition, 
+                                 levels = c("Before",
+                                            "After"))
+
+qc_df_all_df$Age <- factor(qc_df_all_df$Age, 
+                                 levels = c("young",
+                                            "old"))
+
+qc_df_all_df$Identity <- factor(qc_df_all_df$Identity, 
+                                 levels = c(
+                                   names(col_emi_red),
+                                   names(col_rec_red)
+                                 ))
+
+```
+
+```{r}
+
+plot_e <- ggplot(as.data.frame(qc_df_all_df), 
+                  aes(x = Age, y = detected, color = Age))+
+  geom_quasirandom(size = 0.1)+
+  facet_grid(cols = vars(condition))+
+  scale_color_manual("Age", values = col_age)
+
+plot_f <- ggplot(as.data.frame(qc_df_all_df[qc_df_all_df$condition == "After",]),
+                  aes(x = Age, y = detected, color = Age))+
+  geom_quasirandom(size = 0.1)+
+  facet_grid(cols = vars(Identity), switch = "x")+
+  scale_color_manual("Age", values = col_age)+
+  ggtitle("After")
+
+  
+plot_e  
+plot_f
+  
+```
+
+```{r}
+
+med_yng <- median(qc_df_all_df$detected[
+  intersect(which(qc_df_all_df$Age == "young"),
+            which(qc_df_all_df$condition == "before downsampling"))])
+med_old <- median(qc_df_all_df$detected[
+  intersect(which(qc_df_all_df$Age == "old"),
+            which(qc_df_all_df$condition == "before downsampling"))])
+
+med_yng
+med_old
+
+2818/1661
+
+```
+
+## G
+
+```{r}
+
+ctints_both <- rbind(ctints_yng[[1]],
+                    ctints_old[[1]])
+ctints_raw_both <- rbind(
+                    ctints_yng_raw[[1]],
+                    ctints_old_raw[[1]])
+
+ctints_yng[[1]]$condition <- "none"
+ctints_old[[1]]$condition <- "none"
+
+ctints_all <- rbind(ctints_yng[[1]],
+                    ctints_old[[1]],
+                    ctints_yng_raw[[1]],
+                    ctints_old_raw[[1]])
+
+ctints_all$condition[ctints_all$condition == "none"] <- "After pre-processing"
+ctints_all$condition[ctints_all$condition == "no pre-processing steps"] <- "Before pre-processing"
+
+ctints_all$condition <- factor(ctints_all$condition, 
+                               levels = c("Before pre-processing", "After pre-processing"))
+
+```
+
+```{r}
+
+plot_g <- ggplot(ctints_all)+
+  geom_point(aes(x = nr_cells,  y = nr_ints, 
+                color = age))+
+  theme_classic()+
+  scale_color_manual("Age", values = col_age)+
+  facet_grid(rows = vars(age), cols = vars(condition))
+
+plot_g
+
+```
+
+## H
+
+PCA of nr of interactions per cell type pair
+
+```{r}
+
+ctpints_both <- rbind(ctpints_yng[[1]], ctpints_old[[1]])
+ctpints_both$age <- factor(ctpints_both$age, levels = c("young", "old"))
+ctpints_both$emitter <- factor(ctpints_both$emitter, 
+                               levels = names(col_emi_red))
+ctpints_both$receiver <- factor(ctpints_both$receiver, 
+                               levels = names(col_rec_red))
+```
+
+```{r}
+
+ctpints_both_raw <- rbind(ctpints_yng_raw[[1]], ctpints_old_raw[[1]])
+ctpints_both_raw$age <- factor(ctpints_both_raw$age, levels = c("young", "old"))
+ctpints_both_raw$emitter <- factor(ctpints_both_raw$emitter, 
+                               levels = names(col_emi_red))
+ctpints_both_raw$receiver <- factor(ctpints_both_raw$receiver, 
+                               levels = names(col_rec_red))
+```
+
+
+```{r}
+
+# must reorder the ctpints object to fit the rownames of the cpi_pca objects
+ctpints_both_test <- ctpints_both
+ctpints_both_test$ct_pairs <- paste(ctpints_both_test$ct_pairs, 
+                                    ctpints_both_test$species, 
+                                    ctpints_both_test$age, sep = "_")
+ctpints_both_test$ct_pairs[
+  grep("young", 
+       ctpints_both_test$ct_pairs)] <- gsub("young", 
+                                            "yng", 
+                                            ctpints_both_test$ct_pairs)
+
+ctpints_both_raw_test <- ctpints_both_raw
+ctpints_both_raw_test$ct_pairs <- paste(ctpints_both_raw_test$ct_pairs, 
+                                    ctpints_both_raw_test$species, 
+                                    ctpints_both_raw_test$age, 
+                                    "raw", sep = "_")
+
+ctpints_both_raw_test$ct_pairs <- gsub("young", 
+                                            "yng", 
+                                            ctpints_both_raw_test$ct_pairs)
+
+ctpints_both_test <- ctpints_both_test[
+  match(rownames(cpi_merged_pca$PCA[1:(nrow(cpi_merged_pca$PCA)-1),]),
+                                             ctpints_both_test$ct_pairs),]
+ctpints_both_raw_test <- ctpints_both_raw_test[
+  match(rownames(cpi_merged_pca_raw$PCA[1:(nrow(cpi_merged_pca_raw$PCA)-1),]),
+                                             ctpints_both_raw_test$ct_pairs),]
+
+plot_h1 <- ggplot(cpi_merged_pca$PCA[1:(nrow(cpi_merged_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     colour = ctpints_both_test$nr_ints))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("PC2 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("PC1 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))
+
+
+
+plot_h2 <- ggplot(cpi_merged_pca_raw$PCA[1:(nrow(cpi_merged_pca_raw$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     colour = ctpints_both_raw_test$nr_ints))+
+  geom_point(size = 1.5)+
+  theme_classic()+
+  ylab(paste("PC2 [", round(cpi_merged_pca_raw$PCA[
+    nrow(cpi_merged_pca_raw$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("PC1 [", round(cpi_merged_pca_raw$PCA[
+    nrow(cpi_merged_pca_raw$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))
+
+plot_h1
+plot_h2
+
+```
+
+## I&J
+
+Repertoires: which genes are expressed in over 5% of cells?
+This takes very long to recalculate.
+
+```{r}
+
+sce_old_lig <- sce_old[!is.na(match(rowData(sce_old)$ID,
+                                unique(lrdb_comp$interactions$ligand_ensembl_id))),]
+sce_yng_lig <- sce_yng[!is.na(match(rowData(sce_yng)$ID,
+                                unique(lrdb_comp$interactions$ligand_ensembl_id))),]
+
+sce_old_rec <- sce_old[!is.na(match(rowData(sce_old)$ID,
+                                unique(lrdb_comp$interactions$receptor_ensembl_id))),]
+sce_yng_rec <- sce_yng[!is.na(match(rowData(sce_yng)$ID,
+                                unique(lrdb_comp$interactions$receptor_ensembl_id))),]
+
+```
+
+```{r}
+
+# remove all cell types that were not detected to avoid dividing by 0 
+sce_old_lig_pec <- expr_cells_perc(
+  assay = "downsampled",
+  sce = sce_old_lig,
+  cts = levels(colData(sce_old)$Identity)[
+    which(levels(colData(sce_old)$Identity) %in% 
+            unique(colData(sce_old)$Identity))],
+  cts_list = as.list(levels(colData(sce_old)$Identity)[
+    which(levels(colData(sce_old_lig)$Identity) %in% 
+            unique(colData(sce_old_lig)$Identity))]))
+
+sce_yng_lig_pec <- expr_cells_perc(
+  assay = "downsampled",  sce_yng_lig,
+  cts = levels(colData(sce_yng)$Identity)[
+    which(levels(colData(sce_yng)$Identity) %in% 
+            unique(colData(sce_yng)$Identity))],
+  cts_list = as.list(levels(colData(sce_yng)$Identity)[
+    which(levels(colData(sce_yng)$Identity) %in% 
+            unique(colData(sce_yng)$Identity))]))
+
+
+sce_old_rec_pec <- expr_cells_perc(
+  assay = "downsampled",  sce_old_rec,
+  cts = levels(colData(sce_old)$Identity)[
+    which(levels(colData(sce_old)$Identity) %in% 
+            unique(colData(sce_old)$Identity))],
+  cts_list = as.list(levels(colData(sce_old_lig)$Identity)[
+    which(levels(colData(sce_old_lig)$Identity) %in% 
+            unique(colData(sce_old_lig)$Identity))]))
+
+sce_yng_rec_pec <- expr_cells_perc(
+  assay = "downsampled",  sce_yng_rec,
+  cts = levels(colData(sce_yng)$Identity)[
+    which(levels(colData(sce_yng)$Identity) %in% 
+            unique(colData(sce_yng)$Identity))],
+  cts_list = as.list(levels(colData(sce_yng)$Identity)[
+    which(levels(colData(sce_yng)$Identity) %in% 
+            unique(colData(sce_yng)$Identity))]))
+
+```
+
+Prepare data for ggplot visualisation.
+
+```{r}
+
+sce_old_pec_lig_subs <- sce_old_lig_pec[,which(colnames(sce_old_lig_pec) 
+                                         %in% names(col_emi_red))]
+sce_yng_pec_lig_subs <- sce_yng_lig_pec[,which(colnames(sce_yng_lig_pec) 
+                                         %in% names(col_emi_red))]
+
+sce_old_pec_rec_subs <- sce_old_rec_pec[,which(colnames(sce_old_rec_pec) 
+                                         %in% names(col_rec_red))]
+sce_yng_pec_rec_subs <- sce_yng_rec_pec[,which(colnames(sce_yng_rec_pec) 
+                                         %in% names(col_rec_red))]
+
+sce_old_pec_lig_gg <- sce_old_pec_lig_subs %>%
+  gather(colnames(sce_old_pec_lig_subs), key = "celltype", value = "percentage")
+sce_yng_pec_lig_gg <- sce_yng_pec_lig_subs %>%
+  gather(colnames(sce_yng_pec_lig_subs), key = "celltype", value = "percentage")
+
+sce_old_pec_rec_gg <- sce_old_pec_rec_subs %>%
+  gather(colnames(sce_old_pec_rec_subs), key = "celltype", value = "percentage")
+sce_yng_pec_rec_gg <- sce_yng_pec_rec_subs %>%
+  gather(colnames(sce_yng_pec_rec_subs), key = "celltype", value = "percentage")
+
+sce_old_pec_lig_gg$percentage <- sce_old_pec_lig_gg$percentage *100
+sce_yng_pec_lig_gg$percentage <- sce_yng_pec_lig_gg$percentage *100
+
+sce_old_pec_rec_gg$percentage <- sce_old_pec_rec_gg$percentage *100
+sce_yng_pec_rec_gg$percentage <- sce_yng_pec_rec_gg$percentage *100
+
+sce_old_pec_lig_gg$celltype <- factor(sce_old_pec_lig_gg$celltype, levels = 
+                                     names(col_emi_red))
+sce_yng_pec_lig_gg$celltype <- factor(sce_yng_pec_lig_gg$celltype, levels = 
+                                     names(col_emi_red))
+
+sce_old_pec_rec_gg$celltype <- factor(sce_old_pec_rec_gg$celltype, levels = 
+                                     names(col_rec_red))
+sce_yng_pec_rec_gg$celltype <- factor(sce_yng_pec_rec_gg$celltype, levels = 
+                                     names(col_rec_red))
+
+```
+
+```{r}
+
+sce_yng_pec_lig_gg$annotation <- "Ligand"
+sce_yng_pec_rec_gg$annotation <- "Receptor"
+
+gg_df_g_y <- rbind(sce_yng_pec_lig_gg, sce_yng_pec_rec_gg)
+
+plot_i <- ggplot(gg_df_g_y, aes(x = celltype, y = percentage, color = annotation))+
+  geom_quasirandom(size = 0.3)+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Fraction of cells expressing L/R genes [%]")+
+  xlab("Cell type")+
+  scale_color_manual("Gene annotation", values = c("Ligand" = col_ann[[1]], 
+                                                   "Receptor" = col_ann[[2]]))+
+  geom_abline(intercept = 5, slope = 0, linetype = "dotted", size = 0.8)
+
+plot_i_legend <- ggplot(gg_df_g_y, aes(x = celltype, y = percentage, color = annotation))+
+  geom_quasirandom(size = 2.5)+
+  theme_classic()
+  
+
+
+legend_i <- get_legend(plot_i_legend)
+plot_i
+
+```
+
+```{r}
+
+sce_old_pec_lig_gg$annotation <- "Ligand"
+sce_old_pec_rec_gg$annotation <- "Receptor"
+
+gg_df_o <- rbind(sce_old_pec_lig_gg, sce_old_pec_rec_gg)
+
+plot_j <- ggplot(gg_df_o, aes(x = celltype, y = percentage, color = annotation))+
+  geom_quasirandom(size = 0.3)+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab("Fraction of cells expressing L/R genes [%]")+
+  xlab("Cell type")+
+  scale_color_manual("Gene annotation", values = c("Ligand" = col_ann[[1]], 
+                                                   "Receptor" = col_ann[[2]]))+
+  geom_abline(intercept = 5, slope = 0, linetype = "dotted", size = 0.8)
+
+plot_j
+
+```
+
+## K
+
+The same plot but by Annotation.
+Young.
+
+```{r}
+
+plot_k1 <- ggplot(gg_df_g_y, aes(x = annotation, y = percentage, color = annotation))+
+  geom_boxplot(outlier.size = 0.7)+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "none")+
+  ylab("Fraction of cells expressing L/R genes [%]")+
+  scale_color_manual("Gene annotation", values = c("Ligand" = col_ann[[1]], 
+                                                   "Receptor" = col_ann[[2]]))+
+  geom_abline(intercept = 5, linetype = 3, slope = 0, size = 0.8)
+
+legend_k1 <- get_legend(plot_k1)
+plot_k1
+
+```
+
+Old.
+
+```{r}
+
+plot_k2 <- ggplot(gg_df_o, aes(x = annotation, y = percentage, color = annotation))+
+  geom_boxplot(outlier.size = 0.7)+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "none")+
+  ylab("Fraction of cells expressing L/R genes [%]")+
+  scale_color_manual("Gene annotation", values = c("Ligand" = col_ann[[1]], 
+                                                   "Receptor" = col_ann[[2]]))+
+  geom_abline(intercept = 5, linetype = 3, slope = 0, size = 0.8)
+
+plot_k2
+
+```
+
+Both.
+
+```{r}
+
+gg_df_g_y$age <- "Young"
+gg_df_o$age <- "Old"
+
+gg_df_both <- rbind(gg_df_g_y, gg_df_o)
+
+gg_df_both$age <- factor(gg_df_both$age, levels = c("Young", "Old"))
+
+plot_k3 <- ggplot(gg_df_both, aes(x = annotation, y = percentage, color = annotation))+
+  geom_boxplot(outlier.size = 0.7)+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle = 90),
+        legend.position = "none")+
+  ylab(expression(atop("Cells expressing",
+                       paste("L/R genes [%]"))))+
+  scale_color_manual("Gene annotation", values = c("Ligand" = col_ann[[1]], 
+                                                   "Receptor" = col_ann[[2]]))+
+  geom_abline(intercept = 5, linetype = 3, slope = 0, size = 0.8)+
+  facet_grid(cols = vars(age))
+
+plot_k3
+
+```
+
+## M
+
+Nr of ligands/receptors after cutoff.
+
+```{r}
+
+nrlrs_both <- rbind(nrlrs_yng, nrlrs_old)
+nrlrs_both$age <- factor(nrlrs_both$age, levels = c("young", "old"))
+nrlrs_both$celltypes <- factor(nrlrs_both$celltypes, 
+                               levels = names(col_cts_red))
+
+nrlrs_both$condition <- "all pre-processing steps"
+nrlrs_both$species <- "mmus"
+```
+
+```{r}
+
+nrlrs_both_nct <- rbind(nrlrs_yng_nct, nrlrs_old_nct)
+
+
+nrlrs_both_nct$age <- factor(nrlrs_both_nct$age, levels = c("young", "old"))
+nrlrs_both_nct$celltypes <- factor(nrlrs_both_nct$celltypes, 
+                               levels = names(col_cts_red))
+
+nrlrs_both_nct$condition <- "no cut-off"
+
+```
+
+```{r}
+
+gg_df2 <- rbind(nrlrs_both_nct,
+               nrlrs_both)
+
+gg_df2$condition <- factor(gg_df2$condition,
+                          levels = c("no cut-off", "all pre-processing steps"))
+
+gg_df2$age <- unfactor(gg_df2$age)
+gg_df2$age[gg_df2$age == "young"] <- "Young"
+gg_df2$age[gg_df2$age == "old"] <- "Old"
+
+gg_df2$age <- factor(gg_df2$age,
+                          levels = c("Young", "Old"))
+gg_df2$annotation <- factor(gg_df2$annotation,
+                            levels = c("emitter", "receiver"))
+
+```
+
+```{r}
+
+plot_m <- ggplot(gg_df2[gg_df2$condition == "all pre-processing steps",], 
+                  aes(x = annotation, y = nr_lrs, color = annotation))+
+  geom_boxplot()+
+  scale_color_manual("Gene classification", values = col_ann)+
+  ylab(expression(atop("Number of ligands or",
+                       paste("receptors per cell type"))))+
+  facet_grid(cols = vars(age))
+  
+plot_m
+  
+```
+
+# Assemble
+
+```{r}
+
+# not much I can do about plot()
+plot_B <- plot_b
+plot_B
+
+```
+
+```{r}
+
+plot_C <- plot_c+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 90))
+
+legend_c <- get_legend(plot_C)
+
+plot_C
+
+```
+
+```{r}
+
+plot_D <- plot_d+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank())
+
+plot_D_legend <- plot_d_leg+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())
+
+legend_D <- get_legend(plot_D_legend)
+
+plot_D
+
+```
+
+```{r}
+
+
+plot_E <- plot_e+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # indidivual additions
+  theme(strip.text.y = element_blank(),
+        strip.text.x = element_text(size = 13, face = "bold"),
+        strip.background.x = element_blank(),
+        strip.background.y = element_blank()
+        )+
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank())+
+  ylab("Gene counts per cell type")+
+  ggtitle("Downsampling")
+              
+
+plot_F <- plot_f+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # indidivual additions
+  theme(strip.text.y = element_blank(),
+        strip.text.x = element_text(size = 11, angle = 90),
+        strip.background.x = element_blank(),
+        strip.background.y = element_blank(),
+        strip.placement = "outside"
+        )+
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank())+
+  ylab("Gene counts per cell")
+ 
+plot_E             
+plot_F
+
+```
+
+```{r}
+
+plot_G <- plot_g+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+    # indidivual additions
+  theme(strip.text.y = element_blank(),
+        strip.text.x = element_text(size = 13, face = "bold"),
+          strip.background.x = element_blank(),
+        strip.background.y = element_blank()
+        )+
+  scale_y_continuous(limits = c(0, 2500), breaks = c(0, 1000, 2000))+
+  scale_x_continuous(limits = c(0, 8000), breaks = c(0, 2500, 5000, 7500))+
+  ylab("Number of interactions per cell type")+
+  xlab("Number of cells per cell type")
+                     
+plot_G
+
+legend_G <- get_legend(plot_G)
+
+```
+
+```{r}
+
+plot_H_legend <- plot_h1+ # base theme
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_gradientn("Interactions/cell type pair", 
+                         colors = c("black", "darkorange3", "gold"),
+                         limits = c(0, 1600))
+
+legend_H <- get_legend(plot_H_legend)
+
+plot_H <- ggarrange(
+  
+  plot_h2+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+    theme(legend.position = "none",
+          strip.text.x = element_text(size = 13, face = "bold"),
+          strip.background.x = element_blank(),
+        strip.background.y = element_blank())+
+    scale_color_gradientn("Interactions/cell type pair", 
+                         colors = c("black", "darkorange3", "gold"),
+                         limits = c(0, 1600))+
+    ggtitle("Before pre-processing")+
+    theme(plot.title = element_text(hjust = 0.45, size = 13, face = "bold"))
+  
+  ,
+
+  plot_h1+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+   theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+    theme(legend.position = "none",
+          strip.text.x = element_text(size = 13, face = "bold",),
+          strip.background.x = element_blank(),
+        strip.background.y = element_blank())+
+    scale_color_gradientn("Interactions/cell type pair", 
+                         colors = c("black", "darkorange3", "gold"),
+                         limits = c(0, 1600))+
+    ggtitle("After pre-processing")+
+    theme(plot.title = element_text(hjust = 0.45, size = 13, face = "bold"))
+  
+  
+
+)
+
+legend_h <- get_legend(plot_H_legend)
+
+plot_H
+
+```
+
+```{r}
+
+plot_I <- plot_i+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.text.x = element_text(angle = 90))+
+  xlab("Cell type")+
+  scale_color_manual("Gene annotation", values = c("Ligand" = col_ann[[1]], 
+                                                   "Receptor" = col_ann[[2]]))+
+  geom_abline(intercept = 5, slope = 0, linetype = "dotted", size = 0.8)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.45))+
+  ggtitle("Young repertoires")+
+ ylab(expression(atop("Cells expressing",
+                       paste("L/R genes [%]"))))
+
+plot_J <- plot_j+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.text.x = element_text(angle = 90))+
+  xlab("Cell type")+
+  scale_color_manual("Gene annotation", values = c("Ligand" = col_ann[[1]], 
+                                                   "Receptor" = col_ann[[2]]))+
+  geom_abline(intercept = 5, slope = 0, linetype = "dotted", size = 0.8)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.45))+
+  ggtitle("Old repertoires")+
+  ylab(expression(atop("Cells expressing",
+                       paste("L/R genes [%]"))))
+
+
+plot_J_legend <- plot_j+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.text.x = element_text(angle = 90))+
+  xlab("Cell type")+
+  scale_color_manual("Gene annotation", values = c("Ligand" = col_ann[[1]], 
+                                                   "Receptor" = col_ann[[2]]))+
+  geom_abline(intercept = 5, slope = 0, linetype = "dotted", size = 0.8)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.45))+
+  ggtitle("Old repertoires")+
+  ylab(expression(atop("Cells expressing",
+                       paste("L/R genes [%]"))))
+
+legend_J <- get_legend(plot_J_legend)
+
+plot_I
+plot_J
+
+```
+
+```{r}
+
+plot_K <- plot_k3+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank())+
+  theme(strip.text.x = element_text(size = 13, face = "bold"),
+          strip.background.x = element_blank(),
+        strip.background.y = element_blank())
+
+plot_k_legend <- get_legend(plot_K)
+  
+plot_K
+
+```
+
+```{r}
+
+plot_M <- plot_m+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())+
+  theme(strip.text.x = element_text(size = 13, face = "bold"),
+          strip.background.x = element_blank(),
+        strip.background.y = element_blank())+
+  ylim(limits = c(0, 200))
+
+plot_M
+
+```
+
+```{r}
+
+plot_B
+plot_C
+plot_D
+plot_E
+plot_F
+plot_G
+plot_H
+plot_I
+plot_J
+plot_K
+plot_M
+
+```
+
+```{r, fig.width = 4.72, fig.height = 1.57}
+
+#12
+
+legend_bcd <-  ggarrange(
+  ncol = 1, 
+  heights = c(2, 1),
+  legend_c, 
+  legend_D
+            )
+
+figure_1_bcd <- ggarrange(
+  ncol = 4,
+  widths = c(3, 3, 3, 3),
+  
+  plot_B,
+  plot_C+theme(legend.position = "none"),
+  legend_bcd,
+  plot_D+theme(legend.position = "none")
+)
+
+figure_1_bcd
+
+ggsave("images/figure_1_bcd.png",
+  figure_1_bcd,
+  width = 12*0.787402,
+  height = 4.3*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+```{r}
+
+figure_1_ef <- ggarrange(
+  ncol = 2,
+  widths = c(5, 7.5),
+  
+  plot_E+theme(legend.position = "none"),
+  plot_F+theme(legend.position = "none")
+)
+
+figure_1_ef
+
+ggsave("images/figure_1_ef.png",
+  figure_1_ef,
+  width = 12*0.787402,
+  height = 4.5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+
+```
+
+
+```{r}
+
+#12
+figure_1_gh <- ggarrange(
+  
+  ncol = 2,
+  #widths = c(6.5, 7),
+  plot_G+theme(legend.position = "none"),
+  ggarrange(
+    ncol = 1,
+    heights = c(2,4),
+    ggarrange(
+      ncol = 2,
+      widths = c(2,2),
+      legend_G,
+      legend_H),
+      plot_H+theme(legend.position = "none")
+    )
+)
+figure_1_gh
+
+ggsave("images/figure_1_gh.png",
+  figure_1_gh,
+  width = 12*0.787402,
+  height = 6*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+```{r}
+
+
+# 12
+figure_1_ijkm <- ggarrange(
+  
+  ncol = 2,
+  widths = c(13, 4),
+  
+  ggarrange(
+    ncol = 1,
+    heights = c(5, 2),
+  ggarrange(
+     ncol = 2,
+      plot_I+theme(legend.position = "none"),
+      plot_J+theme(legend.position = "none")),
+  ggarrange(
+     ncol = 2,
+     widths = c(1, 1),
+    plot_k_legend)),
+  
+  ggarrange(
+    ncol = 1,
+    heights = c(2, 2),
+    plot_K+theme(legend.position = "none"),
+    plot_M+theme(legend.position = "none")
+  )
+)
+figure_1_ijkm
+
+ggsave("images/figure_1_ijkm.png",
+  figure_1_ijkm,
+  width = 12*0.787402,
+  height = 7*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```

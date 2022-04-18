@@ -1,0 +1,968 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+"This method can capture important interactions"
+
+# Preparation
+
+## Libraries
+
+```{r libraries, message = FALSE}
+
+library(SingleCellExperiment)
+library(rlist)
+library(tidyverse)
+library(eulerr)
+library(gridExtra)
+library(cowplot)
+library(scater)
+library(ggbeeswarm)
+library(ggpubr)
+
+```
+
+## Load
+
+### Code
+
+```{r load_code, message = FALSE}
+
+source(file = "../../code/filepath.R")
+source(file = "../../code/colors.R")
+
+```
+
+### Objects
+
+```{r}
+
+mmus_yng_sce_ds <- readRDS(file = paste0(
+    filepath_lv1, "data/sce_objects/mmus/mmus_young_SCE_ds"))
+mmus_old_sce_ds <- readRDS(file = paste0(
+    filepath_lv1, "data/sce_objects/mmus/mmus_old_SCE_ds"))
+
+score_df_yng <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng_ctpints_score_df"))
+
+score_df_old <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old_ctpints_score_df"))
+
+```
+
+```{r}
+
+score_df_yng$Age <- "Young"
+score_df_old$Age <- "Old"
+
+score_df_both <- rbind(score_df_yng, score_df_old)
+
+```
+
+```{r}
+
+sce_all <- cbind(mmus_yng_sce_ds, mmus_old_sce_ds)
+assays(sce_all)$logcounts <- assays(sce_all)$downsampled
+
+```
+
+
+# Figure Parts
+
+## A, B, G, H
+ 
+Umaps corresponding to the histograms
+
+```{r}
+
+plot_a <- plotUMAP(sce_all,  colour_by = "Kitl", point_size = 0.5,
+                       point_alpha = 1)+
+  scale_color_gradientn("Kitlg ", colors = c("black", "darkorange3", "orange", "lightgoldenrod"))
+
+plot_b <- plotUMAP(sce_all,  colour_by = "Kit", point_size = 0.5, 
+                       point_alpha = 1)+
+  scale_color_gradientn("Kit  ", colors = c("black", "darkorange3", "orange", "lightgoldenrod"))
+
+plot_g <- plotUMAP(sce_all,  colour_by = "Cxcl12", point_size = 0.5, 
+                       point_alpha = 1)+
+  scale_color_gradientn("Cxcl12", colors = c("black", "darkorange3", "orange", "lightgoldenrod"))
+
+plot_h <- plotUMAP(sce_all,  colour_by = "Cxcr4", point_size = 0.5, 
+                       point_alpha = 1)+
+  scale_color_gradientn("Cxcr4 ", colors = c("black", "darkorange3", "orange", "lightgoldenrod"))
+
+plot_a
+plot_b
+plot_g
+plot_h
+
+```
+
+## C-F1
+
+Histogram of top % of interactions detected per cell type.
+This requires cpi_interactions_Yng_vs_old to be loaded.
+
+Kitl&Kit
+
+```{r}
+
+plot_c1 <- ggplot(score_df_yng[score_df_yng$interaction == "Kitl&Kit",], 
+                  aes(x = score_percentile, fill = emitter))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_d1 <- ggplot(score_df_yng[score_df_yng$interaction == "Kitl&Kit",], 
+                  aes(x = score_percentile, fill = receiver))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_e1 <- ggplot(score_df_old[score_df_old$interaction == "Kitl&Kit",],
+                  aes(x = score_percentile, fill = emitter))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_f1 <- ggplot(score_df_old[score_df_old$interaction == "Kitl&Kit",], 
+                  aes(x = score_percentile, fill = receiver))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_c1
+plot_d1
+plot_e1
+plot_f1
+
+```
+
+## I-M1
+
+Cxcl12&Cxcr4
+
+```{r}
+
+plot_i1 <- ggplot(score_df_yng[score_df_yng$interaction == "Cxcl12&Cxcr4",],
+                  aes(x = score_percentile, fill = emitter))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_j1 <- ggplot(score_df_yng[score_df_yng$interaction == "Cxcl12&Cxcr4",],
+                  aes(x = score_percentile, fill = receiver))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_k1 <- ggplot(score_df_old[score_df_old$interaction == "Cxcl12&Cxcr4",], 
+                  aes(x = score_percentile, fill = emitter))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+plot_m1 <- ggplot(score_df_old[score_df_old$interaction == "Cxcl12&Cxcr4",], 
+                  aes(x = score_percentile, fill = receiver))+
+  geom_histogram(color = "grey20", size = 0.2, binwidth = 5, boundary = 0)
+
+
+plot_i1
+plot_j1
+plot_k1
+plot_m1
+
+```
+
+## C-F2
+
+Score distributions for all cell types Kitl&Kit
+
+```{r}
+
+plot_c2 <- ggplot(score_df_yng[score_df_yng$interaction == "Kitl&Kit",], 
+                  aes(x = score_percentile, 
+                      color = emitter, y = fct_rev(emitter)))+
+  geom_boxplot()+ 
+  scale_y_discrete(drop=FALSE)
+
+plot_d2 <- ggplot(score_df_yng[score_df_yng$interaction == "Kitl&Kit",], 
+                  aes(x = score_percentile, 
+                      color = receiver, y = fct_rev(receiver)))+
+  geom_boxplot()+ 
+  scale_y_discrete(drop=FALSE)
+
+plot_e2 <- ggplot(score_df_old[score_df_old$interaction == "Kitl&Kit",], 
+                  aes(x = score_percentile, 
+                      color = emitter, y = fct_rev(emitter)))+
+  geom_boxplot()+ 
+  scale_y_discrete(drop=FALSE)
+
+plot_f2 <- ggplot(score_df_old[score_df_old$interaction == "Kitl&Kit",], 
+                  aes(x = score_percentile, 
+                      color = receiver, y = fct_rev(receiver)))+
+  geom_boxplot()+ 
+  scale_y_discrete(drop=FALSE)
+
+
+plot_c2
+plot_d2
+plot_e2
+plot_f2
+
+```
+
+## I-M2
+
+Score distributions for all cell types Cxcl12&Cxcr4
+
+```{r}
+
+plot_i2 <- ggplot(score_df_yng[score_df_yng$interaction == "Cxcl12&Cxcr4",], 
+                  aes(x = score_percentile, 
+                      color = emitter, y = fct_rev(emitter)))+
+  geom_boxplot()+ 
+  scale_y_discrete(drop=FALSE)
+
+plot_j2 <- ggplot(score_df_yng[score_df_yng$interaction == "Cxcl12&Cxcr4",], 
+                  aes(x = score_percentile, 
+                      color = receiver, y = fct_rev(receiver)))+
+  geom_boxplot()+ 
+  scale_y_discrete(drop=FALSE)
+
+
+plot_k2 <- ggplot(score_df_old[score_df_old$interaction == "Cxcl12&Cxcr4",], 
+                  aes(x = score_percentile, 
+                      color = emitter, y = fct_rev(emitter)))+
+  geom_boxplot()+ 
+  scale_y_discrete(drop=FALSE)
+
+plot_m2 <- ggplot(score_df_old[score_df_old$interaction == "Cxcl12&Cxcr4",], 
+                  aes(x = score_percentile, 
+                      color = receiver, y = fct_rev(receiver)))+
+  geom_boxplot()+ 
+  scale_y_discrete(drop=FALSE)
+
+
+
+plot_i2
+plot_j2
+plot_k2
+plot_m2
+
+```
+
+
+
+
+
+# Uniform Formatting
+
+```{r}
+
+plot_A <- plot_a+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.title = element_text(size = 12, face = "bold.italic"),
+        plot.title = element_text(size = 14, face = "bold.italic") )+
+  ggtitle("Kitlg&Kit")
+
+plot_B <- plot_b+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.title = element_text(size = 12, face = "bold.italic"))
+
+plot_G <- plot_g+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.title = element_text(size = 12, face = "bold.italic"),
+        plot.title = element_text(size = 14, face = "bold.italic") )+
+  ggtitle("Cxcl12&Cxcr4")
+
+plot_H <- plot_h+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.title = element_text(size = 12, face = "bold.italic"))
+
+plot_A
+plot_B
+plot_G
+plot_H
+
+```
+
+```{r}
+
+plot_C1 <- plot_c1+
+# base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Emitters", values = col_emi_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab(expression(paste(italic("Kitlg&Kit"), " score percentile")))+
+  ggtitle("Young")
+
+plot_C_leg1 <- plot_c1+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Emitters", values = col_emi_red)
+
+
+legend_C1 <- get_legend(plot_C_leg1)
+
+plot_C1+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_D1 <- plot_d1+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Receivers", values = col_rec_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab(expression(paste(italic("Kitlg&Kit"), " score percentile")))
+
+plot_D1_leg <- plot_D1+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Receivers", values = col_rec_red)
+
+
+legend_D1 <- get_legend(plot_D1_leg)
+
+plot_D1+ theme(legend.position = "none")
+
+
+```
+
+```{r}
+
+plot_E1 <- plot_e1+
+# base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Emitters", values = col_emi_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab(expression(paste(italic("Kitlg&Kit"), " score percentile")))+
+  ggtitle("Old")
+
+plot_E1+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_F1 <- plot_f1+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Emitters", values = col_rec_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab(expression(paste(italic("Kitlg&Kit"), " score percentile")))
+
+plot_F1+theme(legend.position = "none")
+
+```
+
+
+
+
+```{r}
+
+plot_I1 <- plot_i1+
+# base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Emitters", values = col_emi_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab(expression(paste(italic("Cxcl12&Cxcr4"), " score percentile")))+
+  ggtitle("Young")
+
+plot_I1+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_J1 <- plot_j1+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Emitters", values = col_rec_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab(expression(paste(italic("Cxcl12&Cxcr4"), " score percentile")))
+
+plot_J1+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_K1 <- plot_k1+
+# base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Emitters", values = col_emi_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab(expression(paste(italic("Cxcl12&Cxcr4"), " score percentile")))+
+  ggtitle("Old")
+
+plot_K1+ theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_M1 <- plot_m1+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_fill_manual("Emitters", values = col_rec_red)+
+  ylim(c(0, 60))+
+  xlim(0, 100)+
+  ylab("Number of CTPs")+
+  xlab(expression(paste(italic("Cxcl12&Cxcr4"), " score percentile")))
+
+plot_M1+theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_C2 <- plot_c2+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_manual("Emitters", values = col_emi_red)+
+  xlim(0, 100)+ 
+  ylab("Emitters")+
+  xlab("Kitl&Kit score percentile")+
+  scale_y_discrete(labels = c(rep("     ", 11)))+
+  theme(axis.ticks.y = element_blank(),
+        axis.title.x = element_blank())
+  
+plot_C2 + theme(legend.position = "none")
+  
+```
+
+```{r}
+
+plot_D2 <- plot_d2+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_manual("Receivers", values = col_rec_red)+
+  xlim(0, 100)+
+  ylab("Receivers")+
+  xlab("Kitl&Kit score percentile")+
+  scale_y_discrete(labels = c(rep("     ", 11)), drop = FALSE)+
+  theme(axis.ticks.y = element_blank(),
+        axis.title.x = element_blank())
+  
+plot_D2 + theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_E2 <- plot_e2+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_manual("Emitters", values = col_emi_red)+
+  xlim(0, 100)+ 
+  ylab("Emitters")+
+  xlab("Kitl&Kit score percentile")+
+  scale_y_discrete(labels = c(rep("     ", 11)), drop = FALSE)+
+  theme(axis.ticks.y = element_blank(),
+        axis.title.x = element_blank())
+  
+plot_E2 + theme(legend.position = "none")
+  
+```
+
+```{r}
+
+plot_F2 <- plot_f2+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_manual("Receivers", values = col_rec_red)+
+  xlim(0, 100)+
+  ylab("Receivers")+
+  xlab("Kitl&Kit score percentile")+
+  scale_y_discrete(labels = c(rep("     ", 11)), drop = FALSE)+
+  theme(axis.ticks.y = element_blank(),
+        axis.title.x = element_blank())
+  
+plot_F2 + theme(legend.position = "none")
+
+```
+
+
+```{r}
+
+plot_I2 <- plot_i2+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_manual("Emitters", values = col_emi_red)+
+  xlim(0, 100)+ 
+  ylab("Emitters")+
+  xlab("Kitl&Kit score percentile")+
+  scale_y_discrete(labels = c(rep("     ", 11)), drop = FALSE)+
+  theme(axis.ticks.y = element_blank(),
+        axis.title.x = element_blank())
+  
+plot_I2 + theme(legend.position = "none")
+  
+```
+
+```{r}
+
+plot_J2 <- plot_j2+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_manual("Receivers", values = col_rec_red)+
+  xlim(0, 100)+
+  ylab("Receivers")+
+  xlab("Kitl&Kit score percentile")+
+  scale_y_discrete(labels = c(rep("     ", 11)), drop = FALSE)+
+  theme(axis.ticks.y = element_blank(),
+        axis.title.x = element_blank())
+  
+plot_J2 + theme(legend.position = "none")
+
+```
+
+```{r}
+
+plot_K2 <- plot_k2+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_manual("Emitters", values = col_emi_red)+
+  xlim(0, 100)+ 
+  ylab("Emitters")+
+  xlab("Kitl&Kit score percentile")+
+  scale_y_discrete(labels = c(rep("     ", 11)), drop = FALSE)+
+  theme(axis.ticks.y = element_blank(),
+        axis.title.x = element_blank())
+  
+plot_K2 + theme(legend.position = "none")
+  
+```
+
+```{r}
+
+plot_M2 <- plot_m2+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_manual("Receivers", values = col_rec_red)+
+  xlim(0, 100)+
+  ylab("Receivers")+
+  xlab("Kitl&Kit score percentile")+
+  scale_y_discrete(labels = c(rep("     ", 11)), drop = FALSE)+
+  theme(axis.ticks.y = element_blank(),
+        axis.title.x = element_blank())
+  
+  
+plot_M2 + theme(legend.position = "none")
+
+
+```
+
+```{r}
+
+plot_A
+plot_B
+plot_C1
+plot_C2
+plot_D1
+plot_D2
+plot_E1
+plot_E2
+plot_F1
+plot_F2
+
+plot_G
+plot_H
+plot_I1
+plot_I2
+plot_J1
+plot_J2
+plot_K1
+plot_K2
+plot_M1
+plot_M2
+
+```
+
+# Assemble
+
+```{r}
+
+figure_2_abcdef <- ggarrange(
+  
+  ncol = 2,
+  
+  
+  ggarrange(
+    ncol = 1,
+    heights = c(1, 0.05, 2.6),
+    plot_A,
+    NULL,
+    ggarrange(
+      ncol = 1,
+      heights = c(1, 0.05, 1),
+      ggarrange(
+        ncol = 1,
+        heights = c(2, 1.1),
+        plot_C1+theme(legend.position = "none"),
+        plot_C2+theme(legend.position = "none")),
+      NULL,
+      ggarrange(
+        ncol = 1,
+        heights = c(2, 1.1),
+        plot_E1+theme(legend.position = "none"),
+        plot_E2+theme(legend.position = "none"))
+    )
+  ),
+  
+  ggarrange(
+    ncol = 1,
+    heights = c(1, 0.05 ,2.6),
+    plot_B+ggtitle(""),
+    NULL,
+    ggarrange(
+      ncol = 1,
+      heights = c(1, 0.05, 1),
+      ggarrange(
+        ncol = 1,
+         heights = c(2, 1.1),
+        plot_D1+theme(legend.position = "none")+
+          ggtitle(""),
+        plot_D2+theme(legend.position = "none")),
+      NULL,
+      ggarrange(
+        ncol = 1,
+         heights = c(2, 1.1),
+        plot_F1+theme(legend.position = "none")+
+          ggtitle(""),
+        plot_F2+theme(legend.position = "none"))
+    )
+  )
+  
+)
+
+figure_2_abcdef
+
+ggsave("images/figure_2_abcdef.png",
+  figure_2_abcdef,
+  width = 7*0.787402,
+  height = 15*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+
+
+```{r}
+
+figure_2_ghijkm <- ggarrange(
+  
+  ncol = 2,
+  
+  
+  ggarrange(
+    ncol = 1,
+    heights = c(1, 0.05, 2.6),
+    plot_G,
+    NULL,
+    ggarrange(
+      ncol = 1,
+      heights = c(1, 0.05, 1),
+      ggarrange(
+        ncol = 1,
+        heights = c(2, 1.1),
+        plot_I1+theme(legend.position = "none")+
+          theme(axis.title.x = element_text(hjust = 1)),
+        plot_I2+theme(legend.position = "none")),
+      NULL,
+      ggarrange(
+        ncol = 1,
+        heights = c(2, 1.1),
+        plot_K1+theme(legend.position = "none")+
+          theme(axis.title.x = element_text(hjust = 1)),
+        plot_K2+theme(legend.position = "none"))
+    )
+  ),
+  
+  ggarrange(
+    ncol = 1,
+    heights = c(1, 0.05 ,2.6),
+    plot_H+ggtitle(""),
+    NULL,
+    ggarrange(
+      ncol = 1,
+      heights = c(1, 0.05, 1),
+      ggarrange(
+        ncol = 1,
+         heights = c(2, 1.1),
+        plot_J1+theme(legend.position = "none")+
+          ggtitle("")+
+          theme(axis.title.x = element_text(hjust = 1)),
+        plot_J2+theme(legend.position = "none")),
+      NULL,
+      ggarrange(
+        ncol = 1,
+         heights = c(2, 1.1),
+        plot_M1+theme(legend.position = "none")+
+          ggtitle("")+
+          theme(axis.title.x = element_text(hjust = 1)),
+        plot_M2+theme(legend.position = "none"))
+    )
+  )
+  
+)
+
+figure_2_ghijkm
+
+ggsave("images/figure_2_ghijkm.png",
+  figure_2_ghijkm,
+  width = 7*0.787402,
+  height = 15*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+```{r}
+
+figure_2_legends1 <- ggarrange(
+  legend_C1
+)
+
+figure_2_legends1
+
+ggsave("images/figure_2_legends1.png",
+  figure_2_legends1,
+  width = 2.5*0.787402,
+  height = 4*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+figure_2_legends2 <- ggarrange(
+  legend_D1
+)
+
+figure_2_legends2
+
+ggsave("images/figure_2_legends2.png",
+  figure_2_legends2,
+  width = 2.5*0.787402,
+  height = 4*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```

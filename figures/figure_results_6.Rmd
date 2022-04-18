@@ -1,0 +1,971 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+"Take a closer look into LT-HSCs"
+
+## Libraries
+
+```{r libraries, message = FALSE}
+
+library(SingleCellExperiment)
+library(rlist)
+library(tidyverse)
+library(eulerr)
+library(gridExtra)
+library(cowplot)
+library(scater)
+library(ggbeeswarm)
+library(ggpubr)
+library(scran)
+library("factoextra")
+
+```
+
+## Load
+
+### Code
+
+```{r load_code, message = FALSE}
+
+source(file = "../../code/filepath.R")
+source(file = "../../code/colors.R")
+source(file = "../../interactome/functions/cpi_functions_calculation.R")
+source(file = "../../interactome/functions/cpi_functions_analysis.R")
+
+```
+
+### Objects
+
+```{r}
+
+sce_all <- readRDS(file = paste0(
+  filepath_lv1, "data/sce_objects/mmus/mmus_SCE"))
+
+mmus_yng_sce_ds <- readRDS(file = paste0(
+    filepath_lv1, "data/sce_objects/mmus/mmus_young_SCE_ds"))
+mmus_old_sce_ds <- readRDS(file = paste0(
+    filepath_lv1, "data/sce_objects/mmus/mmus_old_SCE_ds"))
+
+sce_all <- cbind(mmus_yng_sce_ds, mmus_old_sce_ds)
+assays(sce_all)$logcounts <- assays(sce_all)$downsampled
+
+
+# corresponding cpi objects
+cpi_yng <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng_cpi"))
+cpi_old <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old_cpi"))
+
+cpi_yng_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_yng_cpi_pca"))
+cpi_old_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_old_cpi_pca"))
+
+cpi_merged_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_cpi_pca"))
+
+
+# corresponding metrics objects
+ctpints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctpints"))
+ctints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctints"))
+nrlrs_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nrlrs"))
+
+ctpints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctpints"))
+ctints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctints"))
+nrlrs_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nrlrs"))
+
+species <- "mmus"
+cpi_both <- cpi_merged_pca
+
+```
+
+
+Merge overview dfs for direct comparion between age groups.
+
+```{r}
+
+ctpints_both <- rbind(ctpints_yng[[1]], ctpints_old[[1]])
+ctpints_both$age <- factor(ctpints_both$age, levels = c("young", "old"))
+ctpints_both$emitter <- factor(ctpints_both$emitter, 
+                               levels = names(col_emi_red))
+ctpints_both$receiver <- factor(ctpints_both$receiver, 
+                               levels = names(col_rec_red))
+```
+
+```{r}
+
+ctints_both <- rbind(ctints_yng[[1]], ctints_old[[1]])
+ctints_both$age <- factor(ctints_both$age, levels = c("young", "old"))
+ctints_both$celltypes <- factor(ctints_both$celltypes, 
+                                levels = names(col_cts_red))
+ctints_both$annotation <- factor(ctints_both$annotation,
+                                 levels = names(col_ann))
+```
+
+```{r}
+
+nrlrs_both <- rbind(nrlrs_yng, nrlrs_old)
+nrlrs_both$age <- factor(nrlrs_both$age, levels = c("young", "old"))
+nrlrs_both$celltypes <- factor(nrlrs_both$celltypes, 
+                               levels = names(col_cts_red))
+```
+
+
+# Figure Parts
+
+## A-C
+
+Umap of HSCs and various genes
+
+```{r}
+
+plot_a <- plotUMAP(sce_all[,sce_all$Fraction == "hsc"],  colour_by = "Cd34",
+                   point_size = 0.4, 
+                  point_alpha = 1)+
+  scale_color_gradientn("Cd34 ", colors = c("black", "darkorange3", "orange", "lightgoldenrod"))
+
+plot_b <- plotUMAP(sce_all[,sce_all$Fraction == "hsc"],  colour_by = "Flt3",
+                   point_size = 0.4, 
+                  point_alpha = 1)+
+  scale_color_gradientn("Flt3 ", colors = c("black", "darkorange3", "orange", "lightgoldenrod"))
+
+plot_c <- plotUMAP(sce_all[,sce_all$Fraction == "hsc"],  colour_by = "Procr",
+                   point_size = 0.4,  point_alpha = 1)+
+  scale_color_gradientn("Procr ", colors = c("black", "darkorange3", "orange", "lightgoldenrod"))
+
+plot_a
+plot_b
+plot_c
+
+```
+
+## D
+
+Overlap receptors
+
+Requires some objects from loaded cpi_interactions_yng_vs_old
+
+```{r}
+
+hsc_ct_list <- ctints_shared_age_list[grep("LT-HSCs", names(ctints_shared_age_list))]
+
+hsc_ctp_list <- ctpints_shared_age_list[grep("LT-HSCs", names(ctpints_shared_age_list))]
+
+hsc_rec_yng <- ctlrs_yng[["LT-HSCs"]]
+hsc_rec_old <- ctlrs_old[["LT-HSCs"]]
+
+```
+
+```{r}
+
+shared_recs <- intersect(hsc_rec_yng$sigmols, hsc_rec_old$sigmols)
+unique_yng_recs <- hsc_rec_yng$sigmols[-which(hsc_rec_yng$sigmols %in% shared_recs)]
+unique_old_recs <- hsc_rec_old$sigmols[-which(hsc_rec_old$sigmols %in% shared_recs)]
+
+```
+
+
+```{r}
+
+fit1 <- euler(c("A" = length(unique_yng_recs), 
+               "B" = length(unique_old_recs), 
+               "A&B" = length(shared_recs)))
+
+plot_d <- plot(fit1, 
+     labels = c("", ""),
+     fills = c("orange", "grey80"),
+     quantities = list(type = "counts", cex = 1))
+
+plot_d
+
+```
+
+## H (similar to D)
+
+```{r}
+
+length_old <- vector()
+length_shared <- vector()
+length_young <- vector()
+
+for(i in 1:length(hsc_ctp_list)){
+  length_old <- c(length_old, length(hsc_ctp_list[[i]]$unique_old_intsctp))
+  length_shared <- c(length_shared, length(hsc_ctp_list[[i]]$shared_intsctp))
+  length_young <- c(length_young, length(hsc_ctp_list[[i]]$unique_yng_intsctp))
+}
+
+fit3 <- euler(c("A" = median(length_young), 
+               "B" = median(length_old), 
+               "A&B" = median(length_shared)))
+
+plot_h <- plot(fit3, 
+     labels = c("", ""),
+     fills = c("orange", "grey80"),
+     quantities = list(type = "counts", cex = 1))
+
+plot_h
+
+```
+
+## E & F
+
+Try to track how many interactions each receptor has and if they are
+conserved.
+
+```{r}
+
+hsc_ctints_yng <- ctints_yng[[2]][["LT-HSCs"]]
+hsc_ctints_old <- ctints_old[[2]][["LT-HSCs"]]
+
+```
+
+```{r}
+
+hsc_rec_yng$nr_ints_per_recep <- vector(length = nrow(hsc_rec_yng))
+
+for(i in 1:nrow(hsc_rec_yng)){
+  
+  hsc_rec_yng$nr_ints_per_recep[i] <- length(grep(hsc_rec_yng$sigmols[i], hsc_ctints_yng$interactions))
+}
+
+hsc_rec_old$nr_ints_per_recep <- vector(length = nrow(hsc_rec_old))
+
+for(i in 1:nrow(hsc_rec_old)){
+  
+  hsc_rec_old$nr_ints_per_recep[i] <- length(grep(hsc_rec_old$sigmols[i], hsc_ctints_old$interactions))
+}
+
+hsc_rec_yng$age <- "young"
+hsc_rec_old$age <- "old"
+
+lths_rec <- rbind(hsc_rec_yng, hsc_rec_old)
+lths_rec$age <- factor(lths_rec$age, levels = c("young", "old"))
+
+lths_rec_shared <- intersect(lths_rec$sigmols[lths_rec$age == "young"],
+                             lths_rec$sigmols[lths_rec$age == "old"])
+setequal(lths_rec_shared, shared_recs)
+
+
+hsc_rec_shared_yng <- hsc_rec_yng[hsc_rec_yng$sigmols %in% lths_rec_shared,]
+hsc_rec_shared_old <- hsc_rec_old[hsc_rec_old$sigmols %in% lths_rec_shared,]
+
+match_pos <- match(hsc_rec_shared_yng$sigmols, hsc_rec_shared_old$sigmols)
+
+hsc_rec_shared_old <- hsc_rec_shared_old[match_pos,]
+
+# add the range_nr between yng and old numbers into yng df
+hsc_rec_shared_yng$range_nr <- hsc_rec_shared_old$nr_ints_per_recep - hsc_rec_shared_yng$nr_ints_per_recep
+  
+hsc_ctints_yng$ligand <- gsub("[&][[:print:]]+", "", hsc_ctints_yng$interactions)
+hsc_ctints_yng$receptor <- gsub("[[:print:]]+[&]", "", hsc_ctints_yng$interactions)
+
+hsc_ctints_old$ligand <- gsub("[&][[:print:]]+", "", hsc_ctints_old$interactions)
+hsc_ctints_old$receptor <- gsub("[[:print:]]+[&]", "", hsc_ctints_old$interactions)
+
+hsc_ctints_yng_df_shared <- hsc_ctints_yng[hsc_ctints_yng$receptor %in% lths_rec_shared,]
+hsc_ctints_old_df_shared <- hsc_ctints_old[hsc_ctints_old$receptor %in% lths_rec_shared,]
+
+for(i in 1:nrow(hsc_rec_shared_yng)){
+  
+  yng_ints <- vector()
+  old_ints <- vector()
+  
+  yng_ints <- hsc_ctints_yng_df_shared$interactions[grep(hsc_rec_shared_yng$sigmols[i],
+                                               hsc_ctints_yng_df_shared$receptor)]
+  old_ints <- hsc_ctints_old_df_shared$interactions[grep(hsc_rec_shared_old$sigmols[i],
+                                               hsc_ctints_old_df_shared$receptor)]
+  
+  if(length(grep("TRUE", is.na(match(old_ints, yng_ints)))) != 0){
+    id <- FALSE
+  }else if(length(grep("TRUE", is.na(match(yng_ints, old_ints)))) != 0){
+    id <- FALSE
+  }else if(hsc_rec_shared_yng$range_nr[i] != 0){
+    id <- FALSE
+  }else{
+    id <- TRUE
+  }
+  
+  hsc_rec_shared_yng$identical_interactions[i] <- id
+  
+}
+
+lths_rec$identical_interactions <- vector(length = nrow(lths_rec))
+
+lths_rec$identical_interactions <- hsc_rec_shared_yng$identical_interactions[
+  match(lths_rec$sigmols, hsc_rec_shared_yng$sigmols)]
+lths_rec$identical_interactions[is.na(lths_rec$identical_interactions)] <- FALSE
+
+i <- 41
+
+length(grep(hsc_rec_old$sigmols[hsc_rec_old$sigmols == "Icam1"], hsc_ctints_old$interactions))
+
+```
+
+```{r}
+
+plot_e <- ggplot(lths_rec, aes(y = nr_ints_per_recep, x = age, 
+                                color = identical_interactions))+
+  geom_quasirandom()
+
+plot_f <- ggplot(hsc_rec_shared_yng, aes(x = range_nr))+
+  geom_bar()
+
+plot_e
+plot_f
+
+```
+
+## G
+
+compare ranks between young and old
+
+```{r}
+
+# add ranks to the rec dataframe
+hsc_rec_shared_yng$rank <- hsc_ctints_yng$rank[match(hsc_rec_shared_yng$sigmols, 
+                                              hsc_ctints_yng$receptor)]
+hsc_rec_shared_old$rank <- hsc_ctints_old$rank[match(hsc_rec_shared_old$sigmols, 
+                                              hsc_ctints_old$receptor)]
+
+
+hsc_rec_shared_yng$range_rank <- hsc_rec_shared_old$rank[match(hsc_rec_shared_yng$sigmols,
+                                            hsc_rec_shared_old$sigmols)] - hsc_rec_shared_yng$rank
+
+
+table(is.na(match(hsc_rec_shared_yng$sigmols,hsc_rec_shared_old$sigmols)))
+table(is.na(match(hsc_rec_shared_old$sigmols, hsc_rec_shared_yng$sigmols)))
+
+```
+
+```{r}
+
+plot_g <- ggplot(hsc_rec_shared_yng, aes(y = range_rank, x = celltypes))+
+  geom_quasirandom()
+
+plot_g
+
+```
+
+## J
+
+Score percentile changes.
+
+```{r}
+
+score_df_yng_hsc <- score_df_yng[score_df_yng$receiver == "LT-HSCs",]
+score_df_old_hsc <- score_df_old[score_df_old$receiver == "LT-HSCs",]
+
+matched_combis <- intersect(
+  paste0(score_df_old_hsc$ct_pair, score_df_old_hsc$interaction), 
+  paste0(score_df_yng_hsc$ct_pair, score_df_yng_hsc$interaction))
+
+
+score_df_yng_hsc <- score_df_yng_hsc[
+  !is.na(match(paste0(score_df_yng_hsc$ct_pair, score_df_yng_hsc$interaction), 
+               matched_combis)),]
+score_df_old_hsc <- score_df_old_hsc[
+  !is.na(match(paste0(score_df_old_hsc$ct_pair, 
+                      score_df_old_hsc$interaction), matched_combis)),]
+
+score_df_yng_hsc <- score_df_yng_hsc[match(
+  paste0(score_df_old_hsc$ct_pair, score_df_old_hsc$interaction),
+  paste0(score_df_yng_hsc$ct_pair, score_df_yng_hsc$interaction)),]
+
+score_df_yng_hsc$range_perc <- score_df_old_hsc$score_percentile - score_df_yng_hsc$score_percentile
+score_df_yng_hsc$range_score <- score_df_old_hsc$score - score_df_yng_hsc$score
+
+```
+
+```{r}
+
+plot_j <- ggplot(score_df_yng_hsc, 
+                 aes(x = ct_pair, y = range_perc, 
+                     color = c(score_df_yng_hsc$range_perc > 33) | score_df_yng_hsc$range_perc < (-33)))+
+  geom_quasirandom()
+
+plot_j
+
+```
+
+## I
+
+Types of interaction.
+
+This plot requires plot J thats why it's last
+
+```{r}
+
+# unique old
+uni_old <- vector()
+for(i in 1:length(hsc_ctp_list)){
+  uni_old <- c(uni_old, hsc_ctp_list[[i]]$unique_old_intsctp)
+}
+
+uni_old <- unique(uni_old)
+uni_old
+
+uni_yng <- vector()
+for(i in 1:length(hsc_ctp_list)){
+  uni_yng <- c(uni_yng, hsc_ctp_list[[i]]$unique_yng_intsctp)
+}
+
+uni_yng <- unique(uni_yng)
+uni_yng
+
+interactions_all <- as.data.frame(
+  table(cpi_yng$Interactions$interaction_type[
+    cpi_yng$Interactions$interaction_pair %in% uni_old]))
+colnames(interactions_all)[1] <- "Interaction_type" 
+interactions_all$age <- "old"
+
+# all old
+interactions_old <- as.data.frame(table(cpi_old$Interactions$interaction_type[
+  is.nan(rowMeans(cpi_old$Score, na.rm = TRUE)) == FALSE]))
+
+interactions_all$mmus_old[match(interactions_old$Var1, interactions_all[,1])] <- interactions_old$Freq
+
+# 33 percentile change
+over33_Change <- score_df_yng_hsc$interaction[c(
+  which(score_df_yng_hsc$range_perc > 33),
+  which(score_df_yng_hsc$range_perc < -33))]
+over33_Change <- unique(over33_Change)
+
+interactions_change <- as.data.frame(
+  table(cpi_yng$Interactions$interaction_type[
+    cpi_yng$Interactions$interaction_pair %in% over33_Change]))
+
+interactions_all$change_old[
+  match(interactions_change$Var1, 
+        interactions_all[,1])] <- interactions_change$Freq
+
+
+interactions_all <- pivot_longer(interactions_all, 
+                                 cols = c(2,4, 5),
+                                 names_to = "Sample")
+interactions_all$value[is.na(interactions_all$value)] <- 0
+
+interactions_all$Sample[
+  interactions_all$Sample == "mmus_old"] <- "all old"
+interactions_all$Sample[
+  interactions_all$Sample == "Freq"] <- "uniquely old"
+interactions_all$Sample[
+  interactions_all$Sample == "change_old"] <- "differentially scored"
+
+interactions_all$Sample <- factor(interactions_all$Sample, levels = c(
+  "all old", "uniquely old", "differentially scored"
+))
+
+plot_i <-  ggplot(interactions_all,  aes(x = Sample,
+                              y = value,
+                              fill = Interaction_type))+
+  geom_col(position = "fill")+
+  ylab("Number of interactions")+
+  scale_fill_manual("LRI functional annotation", values = col_itp)
+  
+plot_i
+
+```
+
+## K & M
+
+1st and 3rd most important PCs
+
+```{r}
+
+# perform PCA again so I can extract the attributes
+
+df_pca <- get_pca(cpi_both)
+
+vars <- get_pca_var(df_pca)
+
+vars$contrib <- vars$contrib[order(vars$contrib[,2], decreasing = TRUE),]
+top_contrib <- rownames(vars$contrib)[1:50]
+top_contrib <- gsub("[.]", "&", top_contrib)
+
+plot_k <- ggplot(cpi_merged_pca$PCA[1:(nrow(cpi_merged_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     colour = unlist(c(cpi_merged_pca$Score[
+                       rownames(cpi_merged_pca$Score) == top_contrib[1],]))))+
+geom_point(size = 1.5)
+
+
+plot_m <- ggplot(cpi_merged_pca$PCA[1:(nrow(cpi_merged_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     colour = unlist(c(cpi_merged_pca$Score[
+                       rownames(cpi_merged_pca$Score) == top_contrib[3],]))))+
+geom_point(size = 1.5)
+
+plot_k
+plot_m
+
+```
+
+
+## Extract some important lists of genes
+
+LRI that are scored higher in old LT-HSC.
+
+```{r}
+
+unique_old_recs
+
+```
+
+```{r}
+
+unique_yng_recs
+
+```
+
+```{r}
+
+score_perc_higher <- score_df_yng_hsc$interaction[
+  score_df_yng_hsc$range_perc > 33]
+score_perc_higher <- unique(score_perc_higher)
+
+score_perc_higher
+
+```
+
+```{r}
+
+score_perc_lower <- score_df_yng_hsc$interaction[
+  score_df_yng_hsc$range_perc < -33]
+score_perc_lower <- unique(score_perc_lower)
+
+score_perc_lower
+
+```
+
+```{r}
+
+over33_Change <- unique(c(score_perc_lower, score_perc_higher))
+
+diff_33_ligands <- gsub("[&][[:print:]]+", "", over33_Change)
+table(diff_33_ligands)
+diff_33_ligands <- unique(diff_33_ligands)
+
+diff_33_receptors <- gsub("[[:print:]]+[&]", "", over33_Change)
+table(diff_33_receptors)
+diff_33_receptors <- unique(diff_33_receptors)
+
+diff_33_ligands
+diff_33_receptors
+
+```
+
+PCs
+
+reuse the PC vars from before.
+
+```{r}
+
+top_contrib
+
+table(top_contrib %in% over33_Change)
+table(top_contrib %in% uni_old)
+table(top_contrib %in% uni_yng)
+
+```
+
+# Uniform formatting
+
+```{r}
+
+plot_A <- plot_a+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.title = element_text(size = 12, face = "bold.italic"))
+
+plot_A
+
+```
+
+```{r}
+
+plot_B <- plot_b+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.title = element_text(size = 12, face = "bold.italic"))
+
+plot_B
+
+```
+
+```{r}
+
+plot_C <- plot_c+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.title = element_text(size = 12, face = "bold.italic"))
+
+plot_C
+
+```
+
+```{r}
+
+plot_D <-  as.ggplot(plot_d)
+plot_D
+
+```
+
+```{r}
+
+plot_E <- plot_e+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  scale_color_manual(values = c("TRUE" = "orange", "FALSE" = "black"))+
+  labs(color="Identical\ninteractions\n")+
+  theme(axis.text.x = element_text(angle = 90))+
+  ylab(expression(atop("Number of interactions",
+                       paste("each receptor engages in"))))+
+  xlab("Age")+
+  ggtitle("Interaction sets of LT-HSC receptors")
+
+plot_E
+
+```
+
+```{r}
+
+plot_F <- plot_f+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  ylab("Number of receptors")+
+  xlab(expression(atop("Number of interactions",
+                       paste("added per receptor during ageing"))))+
+  ggtitle("")
+
+plot_F
+
+```
+
+```{r}
+
+plot_G <- plot_g+
+    # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  ylab(expression(atop("Receptor rank old-",
+                       paste("receptor rank young"))))+
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank())
+
+plot_G
+
+```
+
+```{r}
+
+plot_H <-  as.ggplot(plot_h)
+plot_H
+
+```
+
+```{r}
+
+plot_I <- plot_i+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  theme(axis.title.x = element_blank(),
+        axis.text.x = element_text(angle = 90))
+
+legend_i <- get_legend(plot_I)
+
+plot_I
+
+```
+
+```{r}
+
+plot_J <- plot_j+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  theme(axis.text.x = element_text(angle = 90))+
+  scale_color_manual(values = c("TRUE" = "orange", "FALSE" = "black"))+
+  labs(color=">33 percentile\nchange")+
+  xlab("CTPs")+
+  ylab(expression(atop("Score percentile old-",
+                       paste("Score percentile young"))))+
+  ggtitle("LT-HSC scores")
+
+
+plot_J
+
+legend_j <- get_legend(plot_J)
+
+```
+
+```{r}
+
+plot_K <- plot_k+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  ylab(paste("PC2 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("PC1 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_gradientn(top_contrib[1], 
+                        colors = c("black", "darkorange3", "lightgoldenrod"), 
+                        limits = c(0,1))+
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.title = element_text(size = 12, face = "bold.italic"))
+
+plot_K
+
+```
+
+```{r}
+
+plot_M <- plot_m+
+   # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # individual additions
+  ylab(paste("PC2 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("PC1 [", round(cpi_merged_pca$PCA[nrow(cpi_merged_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  scale_color_gradientn(top_contrib[3], 
+                        colors = c("black", "darkorange3", "lightgoldenrod"), 
+                        limits = c(0,1))+
+  theme(axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        legend.title = element_text(size = 12, face = "bold.italic"))
+
+plot_M
+
+```
+
+# Assemble
+
+```{r}
+
+figure_6_abc <- ggarrange(
+  ncol = 3,
+  plot_A+ggtitle("LT-HSC marker gene expression"),
+  plot_B+ggtitle(""),
+  plot_C+ggtitle("")
+)
+
+figure_6_abc
+
+ggsave("images/figure_6_abc.png",
+  figure_6_abc,
+  width = 17*0.787402,
+  height = 4.5*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+```{r}
+
+figure_6_d <- ggarrange(
+  plot_D
+)
+
+figure_6_d
+
+ggsave("images/figure_6_d.png",
+  figure_6_d,
+  width = 3*0.787402,
+  height = 3*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+```{r}
+
+figure_6_efg <- ggarrange(
+  ncol = 3,
+  widths = c(3.5, 2, 3),
+  plot_E,
+  plot_F,
+  plot_G+
+    ggtitle("Ranks of LT-HSC receptors")
+)
+
+figure_6_efg
+
+ggsave("images/figure_6_efg.png",
+  figure_6_efg,
+  width = 14*0.787402,
+  height = 4*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+```{r}
+
+figure_6_h <- ggarrange(
+  plot_H
+)
+
+figure_6_h
+
+ggsave("images/figure_6_h.png",
+  figure_6_h,
+  width = 3*0.787402,
+  height = 3*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+```{r}
+
+figure_6_ij <- ggarrange(
+  ncol = 3,
+  widths = c(3,2,3),
+  
+  plot_I+theme(legend.position = "none"),
+  ggarrange(
+    ncol = 1,
+    legend_i,
+    legend_j
+  ),
+  plot_J+theme(legend.position = "none")
+  
+)
+
+figure_6_ij
+
+ggsave("images/figure_6_ij.png",
+  figure_6_ij,
+  width = 14*0.787402,
+  height = 6*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```
+
+```{r}
+
+figure_6_km <- ggarrange(
+ 
+  plot_K,
+  plot_M
+  
+)
+
+figure_6_km
+
+ggsave("images/figure_6_km.png",
+  figure_6_km,
+  width = 10*0.787402,
+  height = 4*0.787402,
+  units = c("in"),
+  dpi = 150)
+
+```

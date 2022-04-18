@@ -1,0 +1,994 @@
+---
+author: "lea wölbert"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+QC conditions, related to figure results 1.
+
+# Preparation
+
+## Libraries
+
+```{r libraries, message = FALSE}
+
+library(SingleCellExperiment)
+library(rlist)
+library(tidyverse)
+library(eulerr)
+library(gridExtra)
+library(cowplot)
+library(scater)
+library(ggbeeswarm)
+library(ggpubr)
+
+```
+
+## Load
+
+### Code
+
+```{r load_code, message = FALSE}
+
+source(file = "../../code/filepath.R")
+source(file = "../../code/colors.R")
+source(file = "../../interactome/functions/cpi_functions_calculation.R")
+
+```
+
+### Objects
+
+CPI
+
+```{r}
+
+mmus_cpi_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_cpi_pca"))
+
+mmus_cpi_raw_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_cpi_raw_pca"))
+
+mmus_cpi_nct_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_cpi_nct_pca"))
+
+mmus_cpi_nds_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_cpi_nds_pca"))
+
+mmus_cpi_nrm_pca <- readRDS(file = paste0(
+  filepath_lv1, "data/cci_files/mmus_cpi_nrm_pca"))
+
+```
+
+
+
+Metrics
+
+```{r}
+
+#young
+
+# normal
+# corresponding metrics objects
+ctpints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctpints"))
+ctints_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_ctints"))
+nrlrs_yng <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nrlrs"))
+
+# raw
+ctpints_yng_raw <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_raw_ctpints"))
+ctints_yng_raw <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_raw_ctints"))
+nrlrs_yng_raw <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_raw_nrlrs"))
+
+# nrm
+ctpints_yng_nrm <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nrm_ctpints"))
+ctints_yng_nrm <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nrm_ctints"))
+nrlrs_yng_nrm <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nrm_nrlrs"))
+
+# nlv
+ctpints_yng_nlv <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nlv_ctpints"))
+ctints_yng_nlv <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nlv_ctints"))
+nrlrs_yng_nlv <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nlv_nrlrs"))
+
+# nct
+ctpints_yng_nct <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nct_ctpints"))
+ctints_yng_nct <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nct_ctints"))
+nrlrs_yng_nct <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nct_nrlrs"))
+
+# nds
+ctpints_yng_nds <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nds_ctpints"))
+ctints_yng_nds <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nds_ctints"))
+nrlrs_yng_nds <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_yng_cpi_nds_nrlrs"))
+
+```
+
+```{r}
+
+#old
+
+# normal
+# corresponding metrics objects
+ctpints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctpints"))
+ctints_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_ctints"))
+nrlrs_old <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nrlrs"))
+
+# raw
+ctpints_old_raw <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_raw_ctpints"))
+ctints_old_raw <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_raw_ctints"))
+nrlrs_old_raw <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_raw_nrlrs"))
+
+# nrm
+ctpints_old_nrm <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nrm_ctpints"))
+ctints_old_nrm <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nrm_ctints"))
+nrlrs_old_nrm <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nrm_nrlrs"))
+
+# nlv
+ctpints_old_nlv <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nlv_ctpints"))
+ctints_old_nlv <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nlv_ctints"))
+nrlrs_old_nlv <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nlv_nrlrs"))
+
+# nct
+ctpints_old_nct <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nct_ctpints"))
+ctints_old_nct <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nct_ctints"))
+nrlrs_old_nct <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nct_nrlrs"))
+
+# nds
+ctpints_old_nds <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nds_ctpints"))
+ctints_old_nds <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nds_ctints"))
+nrlrs_old_nds <- readRDS(file = paste0(
+    filepath_lv1, "data/cci_files/mmus_old_cpi_nds_nrlrs"))
+
+```
+
+```{r}
+
+median(nrlrs_yng_nds$nr_lrs)
+median(nrlrs_old_nds$nr_lrs)
+
+median(nrlrs_yng$nr_lrs)
+median(nrlrs_old$nr_lrs)
+
+```
+
+```{r}
+
+median(nrlrs_yng_nct$nr_lrs)
+median(nrlrs_old_nct$nr_lrs)
+
+median(nrlrs_yng$nr_lrs)
+median(nrlrs_old$nr_lrs)
+
+
+min(nrlrs_yng_nct$nr_lrs)
+min(nrlrs_old_nct$nr_lrs)
+
+min(nrlrs_yng$nr_lrs)
+min(nrlrs_old$nr_lrs)
+
+max(nrlrs_yng_nct$nr_lrs)
+max(nrlrs_old_nct$nr_lrs)
+
+max(nrlrs_yng$nr_lrs)
+max(nrlrs_old$nr_lrs)
+
+```
+
+
+
+```{r}
+
+nrlrs_yng_nds$condition <- "nds"
+nrlrs_old_nds$condition <- "nds"
+
+nrlrs_all <- rbind(nrlrs_yng, nrlrs_old,
+                   nrlrs_yng_raw, nrlrs_old_raw,
+                     nrlrs_yng_nct, nrlrs_old_nct,
+                     nrlrs_yng_nds, nrlrs_old_nds,
+                     nrlrs_yng_nrm, nrlrs_old_nrm)
+
+
+nrlrs_all$condition[nrlrs_all$condition == "after_optimization"] <- "all pre-processing steps"
+nrlrs_all$condition[nrlrs_all$condition == "nct"] <- "no cut-off"
+nrlrs_all$condition[nrlrs_all$condition == "nds"] <- "no downsampling"
+nrlrs_all$condition[nrlrs_all$condition == "nrm"] <- "no cell type removal"
+nrlrs_all$condition[nrlrs_all$condition == "raw"] <- "no pre-processing steps"
+
+nrlrs_all$condition <- factor(nrlrs_all$condition, levels = c(
+  "no pre-processing steps",
+  "no cell type removal", 
+  "no downsampling",
+  "no cut-off",
+  "all pre-processing steps"
+  ))
+
+```
+
+```{r}
+
+ctpints_all <- rbind(ctpints_yng[[1]], ctpints_old[[1]],
+                     ctpints_yng_raw[[1]], ctpints_old_raw[[1]],
+                     ctpints_yng_nct[[1]], ctpints_old_nct[[1]],
+                     ctpints_yng_nds[[1]], ctpints_old_nds[[1]],
+                     ctpints_yng_nrm[[1]], ctpints_old_nrm[[1]])
+
+ctpints_all$condition[ctpints_all$condition == "after_optimization"] <- "all pre-processing steps"
+ctpints_all$condition[ctpints_all$condition == "nct"] <- "no cut-off"
+ctpints_all$condition[ctpints_all$condition == "nds"] <- "no downsampling"
+ctpints_all$condition[ctpints_all$condition == "nrm"] <- "no cell type removal"
+ctpints_all$condition[ctpints_all$condition == "raw"] <- "no pre-processing steps"
+
+ctpints_all$condition <- factor(ctpints_all$condition, levels = c(
+  "no pre-processing steps",
+  "no cell type removal", 
+  "no downsampling",
+  "no cut-off",
+  "all pre-processing steps"
+  ))
+
+```
+
+## A
+
+```{r}
+
+plot_a1 <-  ggplot(nrlrs_all, aes(x = age, y = nr_lrs, color = age))+
+  geom_boxplot()+
+  # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  # indidivual additions
+  scale_color_manual("Age", values = col_age)+
+  facet_grid(
+    cols = vars(condition))+
+  theme(strip.text.x = element_text(size = 11, face = "bold", angle = 90))+
+  theme(axis.text.x = element_blank(),
+          axis.title.x = element_blank(),
+          axis.ticks.x = element_blank())+
+  ylab(expression(atop("Number pf ligands/receptors",
+                       paste("per cell type"))))
+
+plot_a1
+
+```
+
+## B
+
+```{r}
+
+plot_b1 <-  ggplot(ctpints_all, aes(x = age, y = nr_ints, color = age))+
+  geom_boxplot()+
+# base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  scale_color_manual("Age", values = col_age)+
+  facet_grid(
+    cols = vars(condition))+
+   theme(strip.text.x = element_text(size = 10, face = "bold", angle = 90))+
+  theme(axis.text.x = element_blank(),
+          axis.title.x = element_blank(),
+          axis.ticks.x = element_blank())+
+  ylab("Number of LRIs per CTP")
+
+
+plot_b1
+
+```
+
+## C
+
+```{r}
+
+pos_compare_nrlrs <- c(
+  which(nrlrs_all$condition == "all pre-processing steps"), 
+  intersect(which(nrlrs_all$condition == "no cell type removal"),
+            which(!is.na(nrlrs_all$condition))))
+
+plot_c1 <- ggplot(nrlrs_all[pos_compare_nrlrs,], 
+                  aes(x = condition, y = nr_lrs, color = age))+
+  geom_boxplot()+
+ # base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  ylim(limits = c(0, 580))+
+  scale_color_manual("Age", values = col_age)+
+  facet_grid(cols = vars(age))+
+  stat_compare_means(
+    inherit.aes = TRUE,
+    comparisons = list(c("all pre-processing steps", "no cell type removal")),
+    method = "wilcox.test", paired = FALSE, tip.length = 0, 
+    label = "p.signif", hide.ns = TRUE
+  )+
+   theme(strip.text.x = element_text(size = 11, face = "bold"))+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())+
+  ylab("Number of ligands/receptors per cell type")
+
+
+pos_compare_ctpints <- c(
+  which(ctpints_all$condition == "all pre-processing steps"), 
+  intersect(which(ctpints_all$condition == "no cell type removal"),
+            which(!is.na(ctpints_all$condition))))
+
+
+plot_c2 <- ggplot(ctpints_all[pos_compare_ctpints,], 
+                  aes(x = condition, y = nr_ints, color = age))+
+  geom_boxplot()+
+# base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  scale_color_manual("Age", values = col_age)+
+  facet_grid(cols = vars(age))+
+  ylim(limits = c(0, 1600))+
+  stat_compare_means(
+    inherit.aes = TRUE,
+    comparisons = list(c("all pre-processing steps", "no cell type removal")),
+    method = "wilcox.test", paired = FALSE, tip.length = 0, 
+    label = "p.signif" , hide.ns = TRUE
+  )+
+ 
+   theme(strip.text.x = element_text(size = 11, face = "bold"))+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())+
+  ylab("Number of interactions per CTP")
+
+
+
+plot_c1
+
+plot_c2
+
+```
+
+## D
+
+```{r}
+
+pos_compare_nrlrs <- c(
+  which(nrlrs_all$condition == "all pre-processing steps"), 
+  intersect(which(nrlrs_all$condition == "no downsampling"),
+            which(!is.na(nrlrs_all$condition))))
+
+plot_d1 <- ggplot(nrlrs_all[pos_compare_nrlrs,], 
+                  aes(x = condition, y = nr_lrs, color = age))+
+  geom_boxplot()+
+# base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+  ylim(limits = c(0, 580))+
+  scale_color_manual("Age", values = col_age)+
+  facet_grid(cols = vars(age))+
+  stat_compare_means(
+    inherit.aes = TRUE,
+    comparisons = list(c("all pre-processing steps", "no downsampling")),
+    method = "wilcox.test", paired = FALSE, tip.length = 0, 
+    label = "p.signif", hide.ns = TRUE
+  )+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())+
+   theme(strip.text.x = element_text(size = 11, face = "bold"))+
+  ylab("Number of ligands/receptors per cell type")
+
+pos_compare_ctpints <- c(
+  which(ctpints_all$condition == "all pre-processing steps"), 
+  intersect(which(ctpints_all$condition == "no downsampling"),
+            which(!is.na(ctpints_all$condition))))
+
+
+plot_d2 <- ggplot(ctpints_all[pos_compare_ctpints,], 
+                  aes(x = condition, y = nr_ints, color = age))+
+  geom_boxplot()+
+# base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+
+  scale_color_manual("Age", values = col_age)+
+  facet_grid(cols = vars(age))+
+  ylim(limits = c(0, 1600))+
+  stat_compare_means(
+    inherit.aes = TRUE,
+    comparisons = list(c("all pre-processing steps", "no downsampling")),
+    method = "wilcox.test", paired = FALSE, tip.length = 0, 
+    label = "p.signif", hide.ns = TRUE
+  )+
+   theme(strip.text.x = element_text(size = 11, face = "bold"))+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())+
+  ylab("Number of interactions per CTP")
+
+
+plot_d1
+
+plot_d2
+
+```
+
+## E
+
+```{r}
+
+pos_compare_nrlrs <- c(
+  which(nrlrs_all$condition == "all pre-processing steps"), 
+  intersect(which(nrlrs_all$condition == "no cut-off"),
+            which(!is.na(nrlrs_all$condition))))
+
+plot_e1 <- ggplot(nrlrs_all[pos_compare_nrlrs,], 
+                  aes(x = condition, y = nr_lrs, color = age))+
+  geom_boxplot()+
+# base theme
+    theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+  ylim(limits = c(0, 580))+
+  scale_color_manual("Age", values = col_age)+
+  facet_grid(cols = vars(age))+
+  stat_compare_means(
+    inherit.aes = TRUE,
+    comparisons = list(c("all pre-processing steps", "no cut-off")),
+    method = "wilcox.test", paired = FALSE, tip.length = 0, 
+    label = "p.signif", hide.ns = TRUE
+  )+
+   theme(strip.text.x = element_text(size = 11, face = "bold"))+
+  theme(axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())+
+  ylab("Number of ligands/receptors per cell type")
+
+pos_compare_ctpints <- c(
+  which(ctpints_all$condition == "all pre-processing steps"), 
+  intersect(which(ctpints_all$condition == "no cut-off"),
+            which(!is.na(ctpints_all$condition))))
+
+
+plot_e2 <- ggplot(ctpints_all[pos_compare_ctpints,], 
+                  aes(x = condition, y = nr_ints, color = age))+
+# base theme
+    geom_boxplot()+
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())+  
+  scale_color_manual("Age", values = col_age)+
+  facet_grid(cols = vars(age))+
+  ylim(limits = c(0, 1600))+
+  stat_compare_means(
+    inherit.aes = TRUE,
+    comparisons = list(c("all pre-processing steps", "no cut-off")),
+    method = "wilcox.test", paired = FALSE, tip.length = 0, 
+    label = "p.signif", hide.ns = TRUE
+  )+
+   theme(strip.text.x = element_text(size = 11, face = "bold"))+
+   theme(axis.text.x = element_text(angle = 90),
+        axis.title.x = element_blank())+
+  ylab("Number of interactions per CTP")
+
+plot_e1
+
+plot_e2
+
+```
+
+## F
+
+PCAs
+
+"no pre-processing steps"
+"no cell type removal", 
+"no downsampling",
+"no cut-off",
+"all pre-processing steps",
+
+
+```{r}
+
+plot_f1 <- ggplot(mmus_cpi_nrm_pca$PCA[1:(nrow(mmus_cpi_nrm_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_nrm_pca$Celltypes$Age))+
+  geom_point(size = 1.5, alpha = 1)+
+  theme_classic()+
+  scale_color_manual("Age", values = col_age)+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_nrm_pca$PCA[nrow(mmus_cpi_nrm_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_nrm_pca$PCA[nrow(mmus_cpi_nrm_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())
+
+plot_f2 <- ggplot(mmus_cpi_nrm_pca$PCA[1:(nrow(mmus_cpi_nrm_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_nrm_pca$Celltypes$emitter))+
+  geom_point(size = 1.5, alpha = 1)+
+  theme_classic()+
+  scale_color_manual("Emitters", values = col_cts_all[
+    names(col_cts_all) %in% unique(mmus_cpi_nrm_pca$Celltypes$emitter)])+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_nrm_pca$PCA[nrow(mmus_cpi_nrm_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_nrm_pca$PCA[nrow(mmus_cpi_nrm_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())
+
+plot_f3 <- ggplot(mmus_cpi_nrm_pca$PCA[1:(nrow(mmus_cpi_nrm_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_nrm_pca$Celltypes$receiver))+
+  geom_point(size = 1.5, alpha = 1)+
+  theme_classic()+
+  scale_color_manual("Receivers", values = col_cts_all[
+    names(col_cts_all) %in% unique(mmus_cpi_nrm_pca$Celltypes$receiver)])+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_nrm_pca$PCA[nrow(mmus_cpi_nrm_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_nrm_pca$PCA[nrow(mmus_cpi_nrm_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+# base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())
+
+plot_f1
+plot_f2
+plot_f3
+
+```
+
+```{r}
+
+plot_g1 <- ggplot(mmus_cpi_nds_pca$PCA[1:(nrow(mmus_cpi_nds_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_nds_pca$Celltypes$Age))+
+  geom_point(size = 1.5, alpha = 1)+
+  theme_classic()+
+  scale_color_manual("Age", values = col_age)+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_nds_pca$PCA[nrow(mmus_cpi_nds_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_nds_pca$PCA[nrow(mmus_cpi_nds_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())
+
+plot_g2 <- ggplot(mmus_cpi_nds_pca$PCA[1:(nrow(mmus_cpi_nds_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_nds_pca$Celltypes$emitter))+
+  geom_point(size = 1.5, alpha = 1)+
+  theme_classic()+
+  scale_color_manual("Emitters", values = col_cts_all[
+    names(col_cts_all) %in% unique(mmus_cpi_nds_pca$Celltypes$emitter)])+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_nds_pca$PCA[nrow(mmus_cpi_nds_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_nds_pca$PCA[nrow(mmus_cpi_nds_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+ # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())
+plot_g3 <- ggplot(mmus_cpi_nds_pca$PCA[1:(nrow(mmus_cpi_nds_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_nds_pca$Celltypes$receiver))+
+  geom_point(size = 1.5, alpha = 1)+
+  theme_classic()+
+  scale_color_manual("Receivers", values = col_cts_all[
+    names(col_cts_all) %in% unique(mmus_cpi_nds_pca$Celltypes$receiver)])+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_nds_pca$PCA[nrow(mmus_cpi_nds_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_nds_pca$PCA[nrow(mmus_cpi_nds_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+ # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())
+
+plot_g1
+plot_g2
+plot_g3
+
+```
+
+
+
+
+```{r}
+
+plot_h1 <- ggplot(mmus_cpi_pca$PCA[1:(nrow(mmus_cpi_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_pca$Celltypes$Age))+
+  geom_point(size = 1.5, alpha = 1)+
+  theme_classic()+
+  scale_color_manual("Age", values = col_age)+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_pca$PCA[nrow(mmus_cpi_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_pca$PCA[nrow(mmus_cpi_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())
+
+plot_h2 <- ggplot(mmus_cpi_pca$PCA[1:(nrow(mmus_cpi_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_pca$Celltypes$emitter))+
+  geom_point(size = 1.5, alpha = 1)+
+  theme_classic()+
+  scale_color_manual("Emitters", values = col_cts_all[
+    names(col_cts_all) %in% unique(mmus_cpi_pca$Celltypes$emitter)])+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_pca$PCA[nrow(mmus_cpi_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_pca$PCA[nrow(mmus_cpi_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())
+
+plot_h3 <- ggplot(mmus_cpi_pca$PCA[1:(nrow(mmus_cpi_pca$PCA)-1),], 
+                 aes(x = Dim.1, y = Dim.2, 
+                     color = mmus_cpi_pca$Celltypes$receiver))+
+  geom_point(size = 1.5, alpha = 1)+
+  theme_classic()+
+  scale_color_manual("Receivers", values = col_cts_all[
+    names(col_cts_all) %in% unique(mmus_cpi_pca$Celltypes$receiver)])+
+  ylab(paste("Component 2 [", 
+             round(mmus_cpi_pca$PCA[nrow(mmus_cpi_pca$PCA), 2], 
+                                    digits = 2), "%]", sep = ""))+
+  xlab(paste("Component 1 [", 
+             round(mmus_cpi_pca$PCA[nrow(mmus_cpi_pca$PCA), 1], 
+                                    digits = 2), "%]", sep = ""))+
+  # base theme
+  theme_classic()+
+    theme(axis.text = element_text(size = 11),
+          axis.title = element_text(size = 13),
+          legend.title = element_text(size = 12, face = "bold"),
+          legend.text = element_text(size = 11),
+          plot.title = element_text(size = 14, face = "bold"))+
+  theme(plot.background = element_blank(),
+        panel.background = element_blank(),
+        legend.background = element_blank())
+
+plot_h1
+plot_h2
+plot_h3
+
+```
+
+# Assemble
+
+```{r}
+
+plot_a1
+
+plot_b1
+
+legend_ab <- get_legend(plot_a1)
+
+figure_s1_ab <- ggarrange(
+  
+  ncol = 3,
+  widths = c(5, 5, 1),
+    
+  plot_a1+theme(legend.position = "none"),
+  plot_b1+theme(legend.position = "none"),
+  legend_ab
+)
+
+figure_s1_ab
+
+ggsave("images/figure_s1_ab.png",
+  figure_s1_ab,
+  width = 17*0.787402,
+  height = 6*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+
+```{r}
+
+plot_c1
+plot_c2
+plot_d1
+plot_d2
+plot_e1
+plot_e2
+
+figure_s1_cde <- ggarrange(
+  ncol = 6,
+  
+  plot_c1+theme(legend.position = "none"),
+  plot_c2+theme(legend.position = "none"),
+  plot_d1+theme(legend.position = "none"),
+  plot_d2+theme(legend.position = "none"),
+  plot_e1+theme(legend.position = "none"),
+  plot_e2+theme(legend.position = "none")
+  
+)
+
+figure_s1_cde
+
+ggsave("images/figure_s1_cde.png",
+  figure_s1_cde,
+  width = 17*0.787402,
+  height = 6*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+```{r}
+
+legend_1 <- get_legend(plot_f1)
+legend_2 <- get_legend(plot_f2)
+legend_3 <- get_legend(plot_f3)
+
+figure_s1_legend1 <- ggarrange(
+  legend_1
+)
+
+figure_s1_legend2 <- ggarrange(
+  legend_2
+)
+
+figure_s1_legend3 <- ggarrange(
+  legend_3
+)
+
+figure_s1_legend1
+figure_s1_legend2
+figure_s1_legend3
+
+ggsave("images/figure_s1_legend1.png",
+  figure_s1_legend1,
+  width = 1.4*0.787402,
+  height = 1*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+ggsave("images/figure_s1_legend2.png",
+  figure_s1_legend2,
+  width = 2.3*0.787402,
+  height = 5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+ggsave("images/figure_s1_legend3.png",
+  figure_s1_legend3,
+  width = 2.5*0.787402,
+  height = 6.5*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+```
+
+
+```{r}
+
+# 15
+
+plot_f1
+plot_f2
+plot_f3
+
+figure_s1_f <- ggarrange(
+  ncol = 3,
+  plot_f1+theme(legend.position = "none"),
+  plot_f2+theme(legend.position = "none"),
+  plot_f3+theme(legend.position = "none")
+)
+
+figure_s1_f
+
+ggsave("images/figure_s1_f.png",
+  figure_s1_f,
+  width = 15*0.787402,
+  height = 3.25*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+
+```
+
+```{r}
+
+# 15
+
+plot_g1
+plot_g2
+plot_g3
+
+figure_s1_g <- ggarrange(
+  ncol = 3,
+  plot_g1+theme(legend.position = "none"),
+  plot_g2+theme(legend.position = "none"),
+  plot_g3+theme(legend.position = "none")
+)
+
+figure_s1_g
+
+ggsave("images/figure_s1_g.png",
+  figure_s1_g,
+  width = 15*0.787402,
+  height = 3.25*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+
+```
+
+```{r}
+
+# 15
+
+plot_h1
+plot_h2
+plot_h3
+
+figure_s1_h <- ggarrange(
+  ncol = 3,
+  plot_h1+theme(legend.position = "none"),
+  plot_h2+theme(legend.position = "none"),
+  plot_h3+theme(legend.position = "none")
+)
+
+figure_s1_h
+
+ggsave("images/figure_s1_h.png",
+  figure_s1_h,
+  width = 15*0.787402,
+  height = 3.25*0.787402,
+  units = c("in"),
+  dpi = 300)
+
+
+```
